@@ -8,6 +8,7 @@
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/blowdown_diagram.jpg=blowdown_diagram.jpg
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/charging_diagram.png=charging_diagram.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/nifti-icon.png=nifti-icon.png
+# nuitka-project: --include-data-files={MAIN_DIRECTORY}/orifice_diagram.png=orifice_diagram.png
 # nuitka-project: --enable-plugin=pyqt6
 # nuitka-project: --windows-console-mode=disable
 
@@ -29,6 +30,7 @@ from PyQt6.QtGui import QIcon
 from bd_calc import BlowdownCalculator
 from charging_calc import ChargingCalculator
 from conversions import Conversions
+from orifice_calc import OrificeTableWidget
 
 # Signal splash screen removal
 
@@ -69,13 +71,15 @@ class MyTableWidget(QWidget):
         super(QWidget, self).__init__()
 
         self.tabs = QTabWidget()
-        self.tab1 = BlowdownCalculator(self)
-        self.tab2 = ChargingCalculator(self)
-        self.tab3 = Conversions(self)
+        self.tab1 = OrificeTableWidget(self)
+        self.tab2 = BlowdownCalculator(self)
+        self.tab3 = ChargingCalculator(self)
+        self.tab4 = Conversions(self)
 
-        self.tabs.addTab(self.tab1, "Blowdown Calculator")
-        self.tabs.addTab(self.tab2, "Charging Calculator")
-        self.tabs.addTab(self.tab3, "Unit Conversions")
+        self.tabs.addTab(self.tab1, "Orifice Calculator")
+        self.tabs.addTab(self.tab2, "Blowdown Calculator")
+        self.tabs.addTab(self.tab3, "Charging Calculator")
+        self.tabs.addTab(self.tab4, "Unit Conversions")
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)

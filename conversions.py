@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
     QSpacerItem,
-    QSizePolicy
+    QSizePolicy,
+    QTabWidget
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -442,7 +443,25 @@ class FlowCapacityConverter(QWidget):
 
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+        
+        self.tabs = QTabWidget()
+        self.tab1 = Cv_to_CdAConverter(self)
+        self.tab2 = Cv_to_DoConverter(self)
+        self.tab3 = CdA_to_DoConverter(self)
 
+        self.tabs.addTab(self.tab1, "Cv <> CdA")
+        self.tabs.addTab(self.tab2, "Cv <> Do")
+        self.tabs.addTab(self.tab3, "CdA <> Do")
+
+        self.layout = QVBoxLayout()
+        self.title = QLabel("Flow Capacity")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.title.setFont(titlefont)
+        self.layout.addWidget(self.title)
+        self.layout.addWidget(self.tabs)
+        self.setLayout(self.layout)
+
+        """
         layout = QVBoxLayout()
 
         self.title = QLabel("Flow Capacity")
@@ -505,6 +524,357 @@ class FlowCapacityConverter(QWidget):
                     )
                 )
             )
+        except:
+            self.output.setText("Didn't work")
+        """
+
+class Cv_to_CdAConverter(QWidget):
+
+    def __init__(self, parent):
+        super(QWidget, self).__init__(parent)
+
+        layout = QVBoxLayout()
+
+        self.input_label = QLabel("Input: ")
+        self.input_label.setFont(menufont)
+        layout.addWidget(self.input_label)
+
+        self.input_unit = QComboBox()
+        self.input_unit.addItems(["Cv", "CdA"])
+        self.input_unit.currentTextChanged.connect(self.input_unit_changed)
+        layout.addWidget(self.input_unit)
+
+        self.input = QLineEdit()
+        self.input.selectedText()
+        self.input.setPlaceholderText("Input")
+        layout.addWidget(self.input)
+
+        self.input_unit_2_label = QLabel("Area Units")
+        layout.addWidget(self.input_unit_2_label)
+
+        self.input_unit_2 = QComboBox()
+        self.input_unit_2.addItems(area_units)
+        layout.addWidget(self.input_unit_2)
+
+        self.output_label = QLabel("Output")
+        self.output_label.setFont(menufont)
+        layout.addWidget(self.output_label)
+
+        self.output = QLabel()
+        self.output.selectedText()
+        self.output.setFont(menufont)
+        self.output.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.output)
+
+        self.output_unit = QLabel()
+        layout.addWidget(self.output_unit)
+        
+        self.update_button = QPushButton("Update")
+        self.update_button.clicked.connect(self.update_button_clicked)
+        layout.addWidget(self.update_button)
+
+        layout.addItem(verticalSpacer)
+
+        self.setLayout(layout)
+    def input_unit_changed(self):
+        if self.input_unit.currentText() == "CdA":
+            self.output_unit.setText("Cv")
+        elif self.input_unit.currentText() == "Cv":
+            self.output_unit.setText("CdA")
+        self.output_unit.setFont(menufont)
+
+    def update_button_clicked(self):
+        try:
+            if self.input_unit.currentText() == "CdA":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                float(self.input.text()),
+                                self.input_unit_2.currentText(),
+                                "in^2"
+                            ),
+                            self.input_unit.currentText(),
+                            self.output_unit.text()
+                        )
+                    )
+                )
+            elif self.input_unit.currentText() == "Cv":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                float(self.input.text()),
+                                self.input_unit.currentText(),
+                                self.output_unit.text()
+                            ),
+                            "in^2",
+                            self.input_unit_2.currentText()
+                        )
+                    )
+                )
+            else:
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            float(self.input.text()),
+                            self.input_unit.currentText(),
+                            self.output_unit.text()
+                        )
+                    )
+                )
+            if self.input_unit.currentText() == "CdA":
+                self.output_unit.setText("Cv")
+            elif self.input_unit.currentText() == "Cv":
+                self.output_unit.setText("CdA")
+            self.output_unit.setFont(menufont)
+        except:
+            self.output.setText("Didn't work")
+
+class Cv_to_DoConverter(QWidget):
+
+    def __init__(self, parent):
+        super(QWidget, self).__init__(parent)
+
+        layout = QVBoxLayout()
+
+        self.input_label = QLabel("Input: ")
+        self.input_label.setFont(menufont)
+        layout.addWidget(self.input_label)
+
+        self.input_unit = QComboBox()
+        self.input_unit.addItems(["Cv", "Cd, Do"])
+        self.input_unit.currentTextChanged.connect(self.input_unit_changed)
+        layout.addWidget(self.input_unit)
+
+        self.input = QLineEdit()
+        self.input.selectedText()
+        self.input.setPlaceholderText("Input")
+        layout.addWidget(self.input)
+
+        self.input_unit_2_label = QLabel("Diameter Units")
+        layout.addWidget(self.input_unit_2_label)
+
+        self.input_unit_2 = QComboBox()
+        self.input_unit_2.addItems(distance_units)
+        layout.addWidget(self.input_unit_2)
+
+        self.Cd_note = QLabel("Cd, 0 < Cd < 1")
+        self.Cd_note.setFont(menufont)
+        layout.addWidget(self.Cd_note)
+
+        self.discharge_coefficient = QLineEdit()
+        self.discharge_coefficient.selectedText()
+        self.discharge_coefficient.setPlaceholderText("Cd: Discharge Coefficient")
+        layout.addWidget(self.discharge_coefficient)
+
+        self.output_label = QLabel("Output")
+        self.output_label.setFont(menufont)
+        layout.addWidget(self.output_label)
+
+        self.output = QLabel()
+        self.output.selectedText()
+        self.output.setFont(menufont)
+        self.output.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.output)
+
+        self.output_unit = QLabel()
+        layout.addWidget(self.output_unit)
+        
+        self.update_button = QPushButton("Update")
+        self.update_button.clicked.connect(self.update_button_clicked)
+        layout.addWidget(self.update_button)
+
+        layout.addItem(verticalSpacer)
+
+        self.setLayout(layout)
+
+    def input_unit_changed(self):
+        if self.input_unit.currentText() == "Cd, Do":
+            self.output_unit.setText("Cv")
+        elif self.input_unit.currentText() == "Cv":
+            self.output_unit.setText("Cd, Do")
+        self.output_unit.setFont(menufont)
+
+    def update_button_clicked(self):
+        try:
+            if self.input_unit.currentText() == "Cd, Do":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                float(self.input.text()),
+                                self.input_unit_2.currentText(),
+                                "in"
+                            ),
+                            self.input_unit.currentText(),
+                            self.output_unit.text(),
+                            Cd= float(self.discharge_coefficient.text())
+                        )
+                    )
+                )
+            elif self.input_unit.currentText() == "Cv":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                float(self.input.text()),
+                                self.input_unit.currentText(),
+                                self.output_unit.text(),
+                                Cd= float(self.discharge_coefficient.text())
+                            ),
+                            "in",
+                            self.input_unit_2.currentText()
+                        )
+                    )
+                )
+            else:
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            float(self.input.text()),
+                            self.input_unit.currentText(),
+                            self.output_unit.text(),
+                            Cd= float(self.discharge_coefficient.text())
+                        )
+                    )
+                )
+            if self.input_unit.currentText() == "Cd, Do":
+                self.output_unit.setText("Cv")
+            elif self.input_unit.currentText() == "Cv":
+                self.output_unit.setText("Cd, Do")
+            self.output_unit.setFont(menufont)
+        except:
+            self.output.setText("Didn't work")
+
+class CdA_to_DoConverter(QWidget):
+
+    def __init__(self, parent):
+        super(QWidget, self).__init__(parent)
+
+        layout = QVBoxLayout()
+
+        self.input_label = QLabel("Input: ")
+        self.input_label.setFont(menufont)
+        layout.addWidget(self.input_label)
+
+        self.input_unit = QComboBox()
+        self.input_unit.addItems(["CdA", "Cd, Do"])
+        self.input_unit.currentTextChanged.connect(self.input_unit_changed)
+        layout.addWidget(self.input_unit)
+
+        self.input = QLineEdit()
+        self.input.selectedText()
+        self.input.setPlaceholderText("Input")
+        layout.addWidget(self.input)
+
+        self.input_unit_2_label = QLabel("Diameter Units")
+        layout.addWidget(self.input_unit_2_label)
+
+        self.input_unit_2 = QComboBox()
+        self.input_unit_2.addItems(distance_units)
+        layout.addWidget(self.input_unit_2)
+
+        self.input_unit_3_label = QLabel("Area Units")
+        layout.addWidget(self.input_unit_3_label)
+
+        self.input_unit_3 = QComboBox()
+        self.input_unit_3.addItems(area_units)
+        layout.addWidget(self.input_unit_3)
+
+        self.Cd_note = QLabel("Cd, 0 < Cd < 1")
+        self.Cd_note.setFont(menufont)
+        layout.addWidget(self.Cd_note)
+
+        self.discharge_coefficient = QLineEdit()
+        self.discharge_coefficient.selectedText()
+        self.discharge_coefficient.setPlaceholderText("Cd: Discharge Coefficient")
+        layout.addWidget(self.discharge_coefficient)
+
+        self.output_label = QLabel("Output")
+        self.output_label.setFont(menufont)
+        layout.addWidget(self.output_label)
+
+        self.output = QLabel()
+        self.output.selectedText()
+        self.output.setFont(menufont)
+        self.output.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.output)
+
+        self.output_unit = QLabel()
+        layout.addWidget(self.output_unit)
+        
+        self.update_button = QPushButton("Update")
+        self.update_button.clicked.connect(self.update_button_clicked)
+        layout.addWidget(self.update_button)
+
+        layout.addItem(verticalSpacer)
+
+        self.setLayout(layout)
+
+    def input_unit_changed(self):
+        if self.input_unit.currentText() == "Cd, Do":
+            self.output_unit.setText("CdA")
+        elif self.input_unit.currentText() == "CdA":
+            self.output_unit.setText("Cd, Do")
+        self.output_unit.setFont(menufont)
+
+    def update_button_clicked(self):
+        try:
+            if self.input_unit.currentText() == "Cd, Do":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                unit_convert(
+                                    float(self.input.text()),
+                                    self.input_unit_2.currentText(),
+                                    "in"
+                                ),
+                                self.input_unit.currentText(),
+                                self.output_unit.text(),
+                                Cd= float(self.discharge_coefficient.text())
+                            ),
+                            "in^2",
+                            self.input_unit_3.currentText()
+                        )
+                    )
+                )
+            elif self.input_unit.currentText() == "CdA":
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            unit_convert(
+                                unit_convert(
+                                    float(self.input.text()),
+                                    self.input_unit_3.currentText(),
+                                    "in^2"
+                                ),
+                                self.input_unit.currentText(),
+                                self.output_unit.text(),
+                                Cd= float(self.discharge_coefficient.text())
+                            ),
+                            "in",
+                            self.input_unit_2.currentText()
+                        )
+                    )
+                )
+            else:
+                self.output.setText(
+                    '{:0.3e}'.format(
+                        unit_convert(
+                            float(self.input.text()),
+                            self.input_unit.currentText(),
+                            self.output_unit.text(),
+                            Cd= float(self.discharge_coefficient.text())
+                        )
+                    )
+                )
+            if self.input_unit.currentText() == "Cd, Do":
+                self.output_unit.setText("CdA")
+            elif self.input_unit.currentText() == "CdA":
+                self.output_unit.setText("Cd, Do")
+            self.output_unit.setFont(menufont)
         except:
             self.output.setText("Didn't work")
 

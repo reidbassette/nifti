@@ -667,6 +667,37 @@ def mdotidealgas(
         )
     ) if upstream_pressure > downstream_pressure else 0
 
+def mdot2CdA(
+    upstream_pressure,
+    upstream_density,
+    downstream_pressure,
+    mdot,
+    fluid
+):
+    gamma = getfluidproperty(
+        fluid,
+        "CP/CV",
+        "P",
+        upstream_pressure,
+        "D",
+        upstream_density
+    )
+    crit_pressure = (
+        upstream_pressure * (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+    )
+    if crit_pressure > downstream_pressure:
+        P2 = crit_pressure
+    else:
+        P2 = downstream_pressure
+    return (
+        mdot / m.sqrt(
+            upstream_pressure * upstream_density * 2 * gamma / (gamma - 1)
+            * (P2 / upstream_pressure)**(2/gamma)
+            * (1 - (P2/upstream_pressure)**((gamma-1)/gamma))
+        )
+    ) if upstream_pressure > downstream_pressure else 0
+
+
 def moody_tau(
     P1,
     P2,
