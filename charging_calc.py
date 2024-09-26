@@ -219,18 +219,18 @@ class ChargingCalculator(QWidget):
 
     def updatepressureunits(self, s):
         self.pressure_input_label.setText(
-            "Vessel Pressure, " + f'{s}'
+            "Upstream Pressure, " + f'{s}'
         )
         self.downstream_pressure_input_label.setText(
-            "Downstream Pressure, " + f'{s}'
+            "Vessel Initial Pressure, " + f'{s}'
         )
     
     def updatetemperatureunits(self, s):
         self.vessel_temperature_label.setText(
-            "Vessel Temperature, " + f'{s}'
+            "Vessel Initial Temperature, " + f'{s}'
         )
         self.temperature_input_label.setText(
-            "Upstreeam Temperaure, " + f'{s}'
+            "Upstream Temperature, " + f'{s}'
         )
 
     def updatevolumeunits(self, s):

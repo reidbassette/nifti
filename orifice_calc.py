@@ -370,11 +370,6 @@ class OrificeSizeCalculator(QWidget):
         self.mass_flow_rate = QLabel("0.0")
         self.mass_flow_rate.selectedText()
 
-        # Add label for picture
-        self.diagram = QLabel()
-        pixmap = QPixmap(os.path.join(basedir, 'blowdown_diagram.jpg')).scaledToWidth(500)
-        self.diagram.setPixmap(pixmap)
-        self.diagram.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         #Update Button
 

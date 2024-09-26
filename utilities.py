@@ -7,15 +7,15 @@ import numpy as np
 from ctREFPROP.ctREFPROP import REFPROPFunctionLibrary
 from CoolProp.CoolProp import PropsSI
 import os
-"""backend = "REFPROP"
+backend = "REFPROP"
 try:
     RP = REFPROPFunctionLibrary(os.environ["RPPREFIX"])
     RP.SETPATHdll(os.environ["RPPREFIX"])
     MASS_BASE_SI = RP.GETENUMdll(0,"MASS BASE SI").iEnum
-except:"""
-print("REFPROP not found, defaulting to CoolProp")
-backend = "CoolProp"
-MASS_BASE_SI = "NA"
+except:
+    print("REFPROP not found, defaulting to CoolProp")
+    backend = "CoolProp"
+    MASS_BASE_SI = "NA"
 
 #Fluid Properties
 #start section
