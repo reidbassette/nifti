@@ -1,5 +1,5 @@
 
-import os
+import os, sys
 
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -11,7 +11,9 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QSpacerItem,
-    QSizePolicy
+    QSizePolicy,
+    QMainWindow,
+    QApplication
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
@@ -24,6 +26,22 @@ from matplotlib.figure import Figure
 from matplotlib.image import imread
 
 basedir = os.path.dirname(__file__)
+
+class MainWindow(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.title = 'Charging Calculator'
+        self.left = 0
+        self.top = 0
+        self.width = 1200
+        self.height = 900
+        self.setWindowTitle(self.title)
+        #self.setGeometry(self.left, self.top, self.width, self.height)
+        self.table_widget = ChargingCalculator(self)
+        self.setCentralWidget(self.table_widget)
+        
+        self.show()
 
 class MplCanvas(FigureCanvas):
 
@@ -817,3 +835,12 @@ def generate_report(
     else:
         image.save(file_name + ".pdf", dpi=(300, 300))
     plt.close(fig)
+
+def main():
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+if __name__ == '__main__':
+    main()
