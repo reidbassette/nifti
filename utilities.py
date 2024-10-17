@@ -20,6 +20,11 @@ except:
 #Fluid Properties
 #start section
 
+# CoolProp input dictionary
+CoolProp_names = {
+    "TCX": "CONDUCTIVITY"
+}
+
 def getfluidproperty(
     fluid,
     desired_property,
@@ -42,6 +47,7 @@ def getfluidproperty(
     BASE: default is MASS BASE, other option is MOLAR_BASE_SI
     backend: set by file, but options are "REFPROP" or "CoolProp"
     """
+
     if backend == "REFPROP":
         output = RP.REFPROPdll(
             fluid,
@@ -74,14 +80,24 @@ def getfluidproperty(
                 fluid
             )
         else:
-            output = PropsSI(
-                desired_property,
-                first_property,
-                first_value,
-                second_property,
-                second_value,
-                fluid
-            )
+            if CoolProp_names[desired_property] is not None:
+                output = PropsSI(
+                    CoolProp_names[desired_property],
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                )
+            else:
+                output = PropsSI(
+                    desired_property,
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                )
     return output
 
 # end section
@@ -629,7 +645,7 @@ def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
         value2 = from_CdA[unit2](CdA, Cd)
     elif unit1 in density_units and unit2 in density_units:
         kgpcm = to_kgpcm[unit1](value1)
-        value2 = from_kgpcm[unit2](value1)
+        value2 = from_kgpcm[unit2](kgpcm)
     else: 
         print("Not a valid combination")
         value2 = 1
