@@ -20,11 +20,6 @@ except:
 #Fluid Properties
 #start section
 
-# CoolProp input dictionary
-CoolProp_names = {
-    "TCX": "CONDUCTIVITY"
-}
-
 def getfluidproperty(
     fluid,
     desired_property,
@@ -47,7 +42,6 @@ def getfluidproperty(
     BASE: default is MASS BASE, other option is MOLAR_BASE_SI
     backend: set by file, but options are "REFPROP" or "CoolProp"
     """
-
     if backend == "REFPROP":
         output = RP.REFPROPdll(
             fluid,
@@ -80,30 +74,20 @@ def getfluidproperty(
                 fluid
             )
         else:
-            if CoolProp_names[desired_property] is not None:
-                output = PropsSI(
-                    CoolProp_names[desired_property],
-                    first_property,
-                    first_value,
-                    second_property,
-                    second_value,
-                    fluid
-                )
-            else:
-                output = PropsSI(
-                    desired_property,
-                    first_property,
-                    first_value,
-                    second_property,
-                    second_value,
-                    fluid
-                )
+            output = PropsSI(
+                desired_property,
+                first_property,
+                first_value,
+                second_property,
+                second_value,
+                fluid
+            )
     return output
 
 # end section
 
-# Lists of units supported
-#start section
+
+#region Lists of units supported
 fluid_names = [
     "AIR",
     "AMMONIA",
@@ -177,7 +161,12 @@ distance_units = [
     "in"
 ]
 
-#end section
+energy_units = [
+    "W", 
+    "BTU",
+]
+
+#endregion Lists of units supported
 
 # Unit conversions
 # start section
@@ -255,7 +244,7 @@ to_CdA = {
     "CdA": same_unit
 }
 
-# Energy
+#region Energy
 
 def BTU2W(BTU):
     """
@@ -264,7 +253,14 @@ def BTU2W(BTU):
     """
     return BTU * 1055.0559
 
-#area
+def W2BTU(W):
+    """
+    Returns conversion to British Thermal Units from Watts 
+    W: number of Ws
+    """
+    return W / 1055.0559
+#endregion Energy
+#region area
 
 def smm2sm(smm, *args):
     return smm * 1e-6
@@ -283,8 +279,8 @@ def sin2sm(sin, *args):
 
 def sm2sin(sm, *args):
     return sm / 0.00064516
-
-#volume
+#endregion area
+#region volume
 
 def cf2cm(cf, *args):
     return cf * 0.0283168466
@@ -309,7 +305,7 @@ def cin2cm(value, *args):
 
 def cm2cin(value, *args):
     return value * 61023.7441
-
+#endregion volume 
 to_cm = {
     "L": L2cm,
     "m^3": same_unit,
@@ -326,7 +322,7 @@ from_cm = {
     "in^3": cm2cin
 }
 
-#mass
+#region mass
 
 def kg2lb(kg, *args):
     return (kg * 2.204622476038)
@@ -431,7 +427,7 @@ def kg2scf(kg, fluid):
     return cm2cf(kg / D_standard)
 
 
-
+#endregion mass
 #mass flow rate
 
 def kgps2ncmphr(value, fluid):
@@ -452,7 +448,7 @@ def kgps2scfm(value, fluid):
 def scfm2kgps(value, fluid):
     return scf2kg(value, fluid) / 60
 
-#density
+#region density
 
 def kgpcm2gpccm(value, *args):
     return value * 1e-3
@@ -493,8 +489,8 @@ to_kgpcm = {
     "lbm/gal": lbpgal2kgpcm,
     "lbm/in^3": lbpcin2kgpcm
 }
-
-#pressure
+#endregion density
+#region pressure
 
 def psia2Pa(psia, *args):
     return psia * 6894.75729
@@ -613,7 +609,15 @@ from_sm = {
     "in^2": sm2sin,
     "ft^2": sm2sft
 }
-
+from_W = {
+    "W" : same_unit, 
+    "BTU":W2BTU,
+}
+to_W = {
+    "BTU": BTU2W, 
+    "W": same_unit
+}
+#region convert
 def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
     """
     Converts value1 from unit1 to unit2
@@ -646,6 +650,9 @@ def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
     elif unit1 in density_units and unit2 in density_units:
         kgpcm = to_kgpcm[unit1](value1)
         value2 = from_kgpcm[unit2](kgpcm)
+    elif unit1 in energy_units and unit2 in energy_units: 
+        W = to_W[unit1](value1)
+        value2 = from_W[unit2](W)
     else: 
         print("Not a valid combination")
         value2 = 1
