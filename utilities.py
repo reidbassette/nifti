@@ -18,7 +18,15 @@ except:
     MASS_BASE_SI = "NA"
 
 #Fluid Properties
-#start section
+#region getfluidproperty
+
+# CoolProp input dictionary
+CoolProp_names = {
+    "TCX": "CONDUCTIVITY",
+    "CP": "CPMASS",
+    "CV": "CVMASS",
+    "D" :"D"
+}
 
 def getfluidproperty(
     fluid,
@@ -42,6 +50,7 @@ def getfluidproperty(
     BASE: default is MASS BASE, other option is MOLAR_BASE_SI
     backend: set by file, but options are "REFPROP" or "CoolProp"
     """
+
     if backend == "REFPROP":
         output = RP.REFPROPdll(
             fluid,
@@ -74,18 +83,26 @@ def getfluidproperty(
                 fluid
             )
         else:
-            output = PropsSI(
-                desired_property,
-                first_property,
-                first_value,
-                second_property,
-                second_value,
-                fluid
-            )
+            if CoolProp_names[desired_property] is not None:
+                output = PropsSI(
+                    CoolProp_names[desired_property],
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                )
+            else:
+                output = PropsSI(
+                    desired_property,
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                )
     return output
-
-# end section
-
+#endregion getfluidproperty
 
 #region Lists of units supported
 fluid_names = [

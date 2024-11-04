@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import(
      QSpinBox,
      QComboBox,
      QGridLayout,
-     QAbstractScrollArea,
      QSizePolicy
      )
 
@@ -70,12 +69,12 @@ class thermalSolver(QWidget):
         #region LABELS 
         
         self.numberOfNodeLabel = QLabel("CURRENT NODE")
-        self.temperatureLabel = QLabel("NODE TEMPERATURE, K" )
+        self.temperatureLabel = QLabel("NODE TEMPERATURE, " + str(temperature_units[0]))
         self.mediumTypeLabel = QLabel("MEDIUM TYPE")
         self.mediumLabel = QLabel("MEDIUM")
-        self.pressureLabel= QLabel("NODE PRESSURE, Pa") #Specify if gage or not
-        self.volumeLabel = QLabel("NODE VOLUME, m^3") 
-        self.heatGeneratedLabel = QLabel("INTERNAL HEAT GENERATION, W")
+        self.pressureLabel= QLabel("NODE PRESSURE, " + str(pressure_units[0])) 
+        self.volumeLabel = QLabel("NODE VOLUME, " + str(volume_units[0])) 
+        self.heatGeneratedLabel = QLabel("INTERNAL HEAT GENERATION, " + str(energy_units[0]))
         self.emissivityLabel= QLabel("EMISSIVITY")
         self.absorbivityLabel = QLabel("ABSORBTIVITY")
         self.isothermalLabel = QLabel("ISOTHERMAL")
@@ -88,11 +87,13 @@ class thermalSolver(QWidget):
         self.nodeA = QLabel("NODE A")
         self.nodeB = QLabel("NODE B")
         self.heatTransferCoefficientLabel = QLabel("HEAT TRANSFER COEFFICIENT, W/m^2-K")
-        self.heatTransferAreaLabel = QLabel("HEAT TRANSFER AREA, m^2")
+        self.heatTransferCoefficientLabel.setVisible(False)
+        self.heatTransferAreaLabel = QLabel("HEAT TRANSFER AREA, " + str(area_units[0]))
         self.numberofPathsLabel =QLabel("CURRENT PATH")     
         self.timeInitialLabel = QLabel("TIME INITIAL,s")
-        self.timeFinalLabel = QLabel("TIME FINAL, s")  
-        self.dxLabel = QLabel("LENGTH OF PATH, m")
+        self.timeFinalLabel = QLabel("TIME DURATION, s")  
+        self.dxLabel = QLabel("LENGTH OF PATH, " + str(distance_units[0]))
+        self.dxLabel.setVisible(False)
         self.energyUnitsLabel = QLabel("Energy Units")
         self.areaUnitsLabel = QLabel("Area Units")
         self.distanceUnitsLabel = QLabel("Distance Units")
@@ -102,27 +103,27 @@ class thermalSolver(QWidget):
 
         #region UNIT DROPDOWN MENUS
         self.pressureUnits = QComboBox()
-        self.pressureUnits.addItems(["Pa","psig", "psia",  "bar,g","bar,a","atm"])
+        self.pressureUnits.addItems(pressure_units)
         self.pressureUnits.currentTextChanged.connect(self.updatePressureUnits)
 
         self.temperatureUnits = QComboBox()
-        self.temperatureUnits.addItems(["K","C","F","Rank"])
+        self.temperatureUnits.addItems(temperature_units)
         self.temperatureUnits.currentTextChanged.connect(self.updateTemperatureUnits)
         
         self.volumeUnits = QComboBox()
-        self.volumeUnits.addItems(["m^3","mm^3","L","ft^3", "in^3", "gal"])
+        self.volumeUnits.addItems(volume_units)
         self.volumeUnits.currentTextChanged.connect(self.updateVolumeUnits)
 
         self.energyUnits = QComboBox()
-        self.energyUnits.addItems(["W", "BTU"])
+        self.energyUnits.addItems(energy_units)
         self.energyUnits.currentTextChanged.connect(self.updateEnergyUnits)
 
         self.areaUnits = QComboBox()
-        self.areaUnits.addItems(["m^2", "mm^2", "ft^2","in^2"])
+        self.areaUnits.addItems(area_units)
         self.areaUnits.currentTextChanged.connect(self.updateAreaUnits)
 
         self.distanceUnits = QComboBox()
-        self.distanceUnits.addItems(["m", "mm", "ft","in"])
+        self.distanceUnits.addItems(distance_units)
         self.distanceUnits.currentTextChanged.connect(self.updateDistanceUnits)
 
         self.timeUnits = QComboBox()
@@ -153,19 +154,19 @@ class thermalSolver(QWidget):
         self.mediumSelection.setPlaceholderText("Select")
         
         self.pressureInput = QLineEdit()
-        self.pressureInput.setPlaceholderText("101325")
+        self.pressureInput.setPlaceholderText("200")
 
         self.volumeInput = QLineEdit()
-        self.volumeInput.setPlaceholderText(".001")
+        self.volumeInput.setPlaceholderText("10")
 
         self.heatGeneratedInput = QLineEdit()
         self.heatGeneratedInput.setPlaceholderText("100")
 
         self.emissivityInput = QLineEdit()
-        self.emissivityInput.setPlaceholderText("0.3")
+        self.emissivityInput.setPlaceholderText("0.0")
 
         self.absorbivityInput = QLineEdit()
-        self.absorbivityInput.setPlaceholderText("0.2")
+        self.absorbivityInput.setPlaceholderText("0.0")
 
         self.isothermalInput = QComboBox()
         self.isothermalInput.addItems(["True", "False"])
@@ -185,20 +186,22 @@ class thermalSolver(QWidget):
         self.heatTransferModeInput.currentTextChanged.connect(self.toggleHeatTransferProperties)
         self.heatTransferCoefficientInput = QLineEdit()
         self.heatTransferCoefficientInput.setPlaceholderText("10")
+        self.heatTransferCoefficientInput.setVisible(False)
 
         self.heatTransferAreaInput = QLineEdit()
-        self.heatTransferAreaInput.setPlaceholderText("0.1")
+        self.heatTransferAreaInput.setPlaceholderText("1e6")
 
         self.dxInput = QLineEdit()
         self.dxInput.setPlaceholderText(".01")
+        self.dxInput.setVisible(False)
         #endregion PATH ATTRIBUTE SELECTIONS
 
         #region TIME INPUT 
-        self.timeInitialInput = QLineEdit()
-        self.timeInitialInput.setPlaceholderText("0")
+        # self.timeInitialInput = QLineEdit()
+        # self.timeInitialInput.setPlaceholderText("0")
 
-        self.timeFinalInput = QLineEdit()
-        self.timeFinalInput.setPlaceholderText("3600")
+        self.timeDurationInput = QLineEdit()
+        self.timeDurationInput.setPlaceholderText("3600")
         #endregion TIME INPUT
         
         #region NODE TREE
@@ -307,10 +310,10 @@ class thermalSolver(QWidget):
         self.timeEvalAndUnitLayout.addWidget(self.timeUnitsLabel)
         self.timeEvalAndUnitLayout.addWidget(self.timeUnits)
         
-        self.timeEvalAndUnitLayout.addWidget(self.timeInitialLabel)
-        self.timeEvalAndUnitLayout.addWidget(self.timeInitialInput)
+        # self.timeEvalAndUnitLayout.addWidget(self.timeInitialLabel)
+        # self.timeEvalAndUnitLayout.addWidget(self.timeInitialInput)
         self.timeEvalAndUnitLayout.addWidget(self.timeFinalLabel)
-        self.timeEvalAndUnitLayout.addWidget(self.timeFinalInput)
+        self.timeEvalAndUnitLayout.addWidget(self.timeDurationInput)
         self.timeEvalAndUnitLayout.addWidget(self.outputText)
         #endregion SET TIME INPUT LAYOUT
 
@@ -366,7 +369,7 @@ class thermalSolver(QWidget):
         self.setLayout(self.outerLayout)
         #endregion SET OUTER LAYOUT
 
-    '''Set Node Selection based on foregoing Node Selection for path (i.e sets selsection for )'''
+    '''Set Node Selection based on foregoing Node Selection for path (i.e sets selsection for Node B)'''
     def setNodeSelection(self): 
         #Clear selected Nodes
         self.connectedNodesSelection1.clear()
@@ -399,7 +402,6 @@ class thermalSolver(QWidget):
                 "VOLUME," + (self.volumeInput.text()) +':'+ self.volumeUnits.currentText()if self.isothermalInput.currentText() == "False" else '', 
                 "HEAT GENERATED," + (self.heatGeneratedInput.text()) + ':'+self.energyUnits.currentText() if self.heatGeneratedInput.text() != '' else '', 
                 "PRESSURE,"+ (self.pressureInput.text()) + ':'+self.pressureUnits.currentText() if self.mediumTypeSelection.currentText() == "FLUID" else '' , 
-                
                 "EMISSIVITY," + (self.emissivityInput.text()) +':'if self.mediumTypeSelection.currentText() == "SOLID" else '', 
                 "ABSORPTIVITY,"+(self.absorbivityInput.text()) +':'if self.mediumTypeSelection.currentText() == "SOLID" else '',
                 "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':'
@@ -478,7 +480,7 @@ class thermalSolver(QWidget):
            
         except Exception as e:
             self.outputText.setVisible(True)
-            self.outputText.setText("Something went wrong with node update. Check node inputs.")
+            self.outputText.setText("Something went wrong with node update. Check node inputs." + str(e))
 
     def updatePath(self): 
         try:
@@ -499,9 +501,10 @@ class thermalSolver(QWidget):
             attributes =[ 
                 "Node A," + self.connectedNodesSelection1.currentText()+":",
                 "Node B," + self.connectedNodesSelection2.currentText()+':',
-                "h," + self.heatTransferCoefficientInput.text() +':'+ 'W/m^2K' if self.heatTransferModeInput.currentText() == "CONVECTION" else '',
+                
                 "Area," + self.heatTransferAreaInput.text()+':'+ self.areaUnits.currentText(),
                 "dx," + self.dxInput.text()+':' +self.distanceUnits.currentText() if self.heatTransferModeInput.currentText() == "CONDUCTION" else '',
+                "h," + self.heatTransferCoefficientInput.text() +':'+ 'W/m^2K' if self.heatTransferModeInput.currentText() == "CONVECTION" else '',
                 f"{self.heatTransferModeInput.currentText()}," + ':'
             ]
             self.backendPaths = [path for path in self.backendPaths if path.identifier != self.currentPathSelection.value()]
@@ -566,7 +569,7 @@ class thermalSolver(QWidget):
             self.mediumSelection.setCurrentIndex(-1)
 
         elif self.mediumTypeSelection.currentText() == "FLUID":
-            self.mediumSelection.addItems(["HYDROGEN", "ARGON", "NITROGEN","AIR"])
+            self.mediumSelection.addItems(fluid_names)
             self.mediumSelection.setCurrentIndex(-1)
 
     #Change connected node selection items in 2nd connected node box
@@ -617,8 +620,9 @@ class thermalSolver(QWidget):
 
             timeUnit = self.timeUnits.currentText()
             temperatureUnits = self.temperatureUnits.currentText()
-            timeInitial = float(self.timeInitialInput.text())
-            timeFinal = float(self.timeFinalInput.text())
+            # timeInitial = float(self.timeInitialInput.text())
+            timeInitial = 0
+            timeFinal = float(self.timeDurationInput.text())
 
             if timeUnit == "min":
                 timeInitial = timeInitial*60 #Converts min to s
@@ -805,7 +809,7 @@ class thermalSolver(QWidget):
             "TIME INITIAL, " + f'{self.timeUnits.currentText()}'
         )
         self.timeFinalLabel.setText(
-            "TIME FINAL, " + f'{self.timeUnits.currentText()}'
+            "TIME DURATION, " + f'{self.timeUnits.currentText()}'
         )
     def toggleHeatTransferProperties(self):
         if self.heatTransferModeInput.currentText() == "CONDUCTION": 
