@@ -339,112 +339,6 @@ from_cm = {
     "in^3": cm2cin
 }
 
-#region mass
-
-def kg2lb(kg, *args):
-    return (kg * 2.204622476038)
-
-def lb2kg(lb, *args):
-    return lb / 2.204622476038
-
-def nm2kg(nm, fluid):
-    # Normal Flow Conditions
-    T_normal = 293.15
-    P_normal = 101490.8
-    D_normal = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_normal,
-        "T",
-        T_normal
-    )
-    return nm * D_normal
-
-def kg2nm(kg, fluid):
-    # Normal Flow Conditions
-    T_normal = 293.15
-    P_normal = 101490.8
-    D_normal = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_normal,
-        "T",
-        T_normal
-    )
-    return kg / D_normal
-
-def sl2kg(sl, fluid):
-    #Return kg from standard liters
-    #SAES Pure Gas Standard Conditions
-    T_standard = 273.15
-    P_standard = 101490.8
-    D_standard = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_standard,
-        "T",
-        T_standard
-    )
-    return sl/1e3 * D_standard
-
-def kg2sl(kg, fluid):
-    #Return standard liters from kg
-    #SAES Pure Gas Standard Conditions
-    T_standard = 273.15
-    P_standard = 101490.8
-    D_standard = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_standard,
-        "T",
-        T_standard
-    )
-    return kg / D_standard * 1e3
-
-def scf2kg(scf, fluid):
-    """
-    Return kilograms given standard cubic feet and fluid
-    Standard Cubic Feet are evaluated at 14.696 psia, 61 °F
-    scf: number of standard cubic feet, int or float
-    fluid: name of fluid, all caps, REFPROP style
-    """
-    T_standard = F2K(61)
-    P_standard = psia2Pa(14.696)
-    D_standard = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_standard,
-        "T",
-        T_standard
-    )
-    return cf2cm(scf) * D_standard
-    
-def kg2scf(kg, fluid):
-    """
-    Return standard cubic feet given kilograms and fluid
-    Standard Cubic Feet are evaluated at 14.696 psia, 61 °F
-    scf: number of standard cubic feet, int or float
-    fluid: name of fluid, all caps, REFPROP style
-    """
-    T_standard = F2K(61)
-    P_standard = psia2Pa(14.696)
-    D_standard = getfluidproperty(
-        fluid,
-        "D",
-        "P",
-        P_standard,
-        "T",
-        T_standard
-    )
-    return cm2cf(kg / D_standard)
-
-
-#endregion mass
 #mass flow rate
 
 def kgps2ncmphr(value, fluid):
@@ -564,6 +458,135 @@ def F2K(F, *args):
 def K2F(K, *args):
     return Rank2F(K2Rank(K))
 
+#region mass
+
+def kg2lb(kg, *args):
+    return (kg * 2.204622476038)
+
+def lb2kg(lb, *args):
+    return lb / 2.204622476038
+
+def nm2kg(nm, fluid):
+    # Normal Flow Conditions
+    T_normal = 293.15
+    P_normal = 101490.8
+    D_normal = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_normal,
+        "T",
+        T_normal
+    )
+    return nm * D_normal
+
+def kg2nm(kg, fluid):
+    # Normal Flow Conditions
+    T_normal = 293.15
+    P_normal = 101490.8
+    D_normal = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_normal,
+        "T",
+        T_normal
+    )
+    return kg / D_normal
+
+def sl2kg(sl, fluid):
+    #Return kg from standard liters
+    #SAES Pure Gas Standard Conditions
+    T_standard = 273.15
+    P_standard = 101490.8
+    D_standard = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_standard,
+        "T",
+        T_standard
+    )
+    return sl/1e3 * D_standard
+
+def kg2sl(kg, fluid):
+    #Return standard liters from kg
+    #SAES Pure Gas Standard Conditions
+    T_standard = 273.15
+    P_standard = 101490.8
+    D_standard = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_standard,
+        "T",
+        T_standard
+    )
+    return kg / D_standard * 1e3
+
+def scf2kg(scf, fluid):
+    """
+    Return kilograms given standard cubic feet and fluid
+    Standard Cubic Feet are evaluated at 14.696 psia, 61 °F
+    scf: number of standard cubic feet, int or float
+    fluid: name of fluid, all caps, REFPROP style
+    """
+    T_standard = F2K(61)
+    P_standard = psia2Pa(14.696)
+    D_standard = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_standard,
+        "T",
+        T_standard
+    )
+    return cf2cm(scf) * D_standard
+    
+def kg2scf(kg, fluid):
+    """
+    Return standard cubic feet given kilograms and fluid
+    Standard Cubic Feet are evaluated at 14.696 psia, 61 °F
+    scf: number of standard cubic feet, int or float
+    fluid: name of fluid, all caps, REFPROP style
+    """
+    T_standard = F2K(61)
+    P_standard = psia2Pa(14.696)
+    D_standard = getfluidproperty(
+        fluid,
+        "D",
+        "P",
+        P_standard,
+        "T",
+        T_standard
+    )
+    return cm2cf(kg / D_standard)
+
+mass_units = [
+    "kg",
+    "lbm",
+    "Nm^3",
+    "SL",
+    "SCF"
+]
+
+to_kg = {
+    "kg": same_unit,
+    "lbm": lb2kg,
+    "Nm^3": nm2kg,
+    "SL": sl2kg,
+    "SCF": scf2kg
+}
+
+from_kg = {
+    "kg": same_unit,
+    "lbm": kg2lb,
+    "Nm^3": kg2nm,
+    "SL": kg2sl,
+    "SCF": kg2scf    
+}
+
+#endregion mass
 
 from_kgps = {
     "kg/s": same_unit,
@@ -670,6 +693,9 @@ def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
     elif unit1 in energy_units and unit2 in energy_units: 
         W = to_W[unit1](value1)
         value2 = from_W[unit2](W)
+    elif unit1 in mass_units and unit2 in mass_units:
+        kg = to_kg[unit1](value1, fluid)
+        value2 = from_kg[unit2](kg, fluid)
     else: 
         print("Not a valid combination")
         value2 = 1

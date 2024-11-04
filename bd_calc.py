@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QSizePolicy,
     QMainWindow,
-    QApplication
+    QApplication,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
@@ -155,6 +156,10 @@ class BlowdownCalculator(QWidget):
         self.diagram.setPixmap(pixmap)
         self.diagram.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
+
+        self.minor_grid_checkbox = QCheckBox('Minor Grid On')
+
+
         #Update Button
 
         self.update_button = QPushButton('Update Plot')
@@ -192,6 +197,7 @@ class BlowdownCalculator(QWidget):
         layout.addWidget(self.downstream_pressure_input)
         layout.addWidget(self.orifice_area_label)
         layout.addWidget(self.orifice_area)
+        layout.addWidget(self.minor_grid_checkbox)
         layout.addWidget(self.update_button)
         layout.addWidget(self.mass_flow_rate)
         layout.addWidget(self.report_button)
@@ -241,6 +247,9 @@ class BlowdownCalculator(QWidget):
         self.canvas.axes.set_xlabel("Time, " + str(time_units))
         self.canvas.axes.set_title("Vessel Pressure vs. Time")
         self.canvas.axes.grid(True)
+        if self.minor_grid_checkbox.isChecked():
+            self.canvas.axes.minorticks_on()
+            self.canvas.axes.grid(True, which='minor')
         self.canvas.draw()
 
     def update_button_clicked(self):

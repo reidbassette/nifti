@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QSizePolicy,
     QMainWindow,
-    QApplication
+    QApplication,
+    QCheckBox
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
@@ -168,6 +169,8 @@ class ChargingCalculator(QWidget):
         self.update_button = QPushButton('Update Plot')
         self.update_button.clicked.connect(self.update_button_clicked)
 
+        self.minor_grid_checkbox = QCheckBox('Minor Grid On')
+
         #Save Report
         self.report_button = QPushButton('Save Report')
         self.report_button.clicked.connect(self.report_button_clicked)
@@ -203,6 +206,7 @@ class ChargingCalculator(QWidget):
         layout.addWidget(self.vessel_temperature)
         layout.addWidget(self.orifice_area_label)
         layout.addWidget(self.orifice_area)
+        layout.addWidget(self.minor_grid_checkbox)
         layout.addWidget(self.update_button)
         layout.addWidget(self.mass_flow_rate)
         layout.addWidget(self.report_button)
@@ -256,6 +260,9 @@ class ChargingCalculator(QWidget):
         self.canvas.axes.set_xlabel("Time, " + str(time_units))
         self.canvas.axes.set_title("Vessel Pressure vs. Time")
         self.canvas.axes.grid(True)
+        if self.minor_grid_checkbox.isChecked():
+            self.canvas.axes.minorticks_on()
+            self.canvas.axes.grid(True, which='minor')
         self.canvas.draw()
 
     def update_button_clicked(self):

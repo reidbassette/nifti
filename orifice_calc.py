@@ -195,7 +195,7 @@ class MassFlowCalculator(QWidget):
 
     def updatepressureunits(self, s):
         self.pressure_input_label.setText(
-            "Vessel Pressure, " + f'{s}'
+            "Upstream Pressure, " + f'{s}'
         )
         self.downstream_pressure_input_label.setText(
             "Downstream Pressure, " + f'{s}'
@@ -203,12 +203,7 @@ class MassFlowCalculator(QWidget):
     
     def updatetemperatureunits(self, s):
         self.vessel_temperature_label.setText(
-            "Vessel Temperature, " + f'{s}'
-        )
-
-    def updatevolumeunits(self, s):
-        self.vessel_volume_label.setText(
-            "Vessel Volume, " + f'{s}'
+            "Upstream Temperature, " + f'{s}'
         )
 
     def updateareaunits(self, s):
@@ -315,7 +310,6 @@ class OrificeSizeCalculator(QWidget):
 
         self.area_units = QComboBox()
         self.area_units.addItems(area_units)
-        self.area_units.currentTextChanged.connect( self.updateareaunits)
 
         self.mass_flow_units = QComboBox()
         self.mass_flow_units.addItems(mass_flow_units)
@@ -422,11 +416,6 @@ class OrificeSizeCalculator(QWidget):
     def updatetemperatureunits(self, s):
         self.vessel_temperature_label.setText(
             "Upstream Temperature, " + f'{s}'
-        )
-
-    def updateareaunits(self, s):
-        self.orifice_area_label.setText(
-            "Equivalent Orifice Area (CdA), " + f'{s}'
         )
 
     def updatemassflowunits(self, s):
