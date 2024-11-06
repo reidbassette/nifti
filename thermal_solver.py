@@ -220,4 +220,4 @@ def T_vs_t(t, t_eval, path, nodes):
                             )
             return dTdt 
     
-    return solve_ivp(func, t_span=t, t_eval=t_eval, y0=T,method='LSODA', atol= 1e-7)
+    return solve_ivp(func, t_span=t, t_eval=t_eval, y0=T)

@@ -417,9 +417,9 @@ class ChargingCalculator(QWidget):
                 ) 
                 + " " + str(self.mass_flow_units.currentText())
             )
-        except:
+        except Exception as ex:
             self.mass_flow_rate.setText(
-                "Invalid inputs or other error"
+                "Invalid inputs or other error \n Error Message: " + str(ex)
             )
 
     def report_button_clicked(self):

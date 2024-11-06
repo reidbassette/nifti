@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.title)
         # self.setGeometry(100,25,900,300)
         # self.setBaseSize(1200,1000)
-        self.table_widget = thermalSolver()
+        self.table_widget = thermalSolver(self)
         self.setCentralWidget(self.table_widget)
 
         self.show()
@@ -616,7 +616,7 @@ class thermalSolver(QWidget):
             #clear connected paths from last solve
             for node in self.backendNodes:
                 node.connectedPaths = []
-            self.canvas.ax.clear()
+            self.canvas.ax.cla()
 
             timeUnit = self.timeUnits.currentText()
             temperatureUnits = self.temperatureUnits.currentText()
@@ -653,7 +653,7 @@ class thermalSolver(QWidget):
                 y =a.y 
                 for i in range(len(y[:,0])):
                     for j in range(len(y[0,:])):
-                         y[i,j] = unit_convert(y[i,j], "K", self.temperatureUnits.currentText())
+                        y[i,j] = unit_convert(y[i,j], "K", self.temperatureUnits.currentText())
                 for i in range(len(y[:,0])):
                     self.canvas.ax.plot(time, y[i,:])
                     legend.append(f"Node {self.backendNodes[i].identifier}")
@@ -665,6 +665,7 @@ class thermalSolver(QWidget):
             self.canvas.draw()
             self.outputText.setVisible(False)
         except Exception as ex:
+            print(ex)
             self.outputText.setVisible(True)
             self.outputText.setText("Solve Inputs are incorrect/incomplete. Check nodes, paths, and time values")
    
@@ -824,9 +825,12 @@ class thermalSolver(QWidget):
             self.dxInput.setVisible(False)
     #endregion UPDATE METHODS
 
-if __name__ == '__main__': 
+def main():
     app = QApplication([])
     thermalSolve = MainWindow()
     thermalSolve.show()
     sys.exit(app.exec())
+
+if __name__ == '__main__': 
+    main()
 

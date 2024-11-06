@@ -7,6 +7,7 @@ import numpy as np
 from ctREFPROP.ctREFPROP import REFPROPFunctionLibrary
 from CoolProp.CoolProp import PropsSI
 import os
+
 backend = "REFPROP"
 try:
     RP = REFPROPFunctionLibrary(os.environ["RPPREFIX"])
@@ -17,6 +18,7 @@ except:
     backend = "CoolProp"
     MASS_BASE_SI = "NA"
 
+ 
 #Fluid Properties
 #region getfluidproperty
 
@@ -83,7 +85,7 @@ def getfluidproperty(
                 fluid
             )
         else:
-            if CoolProp_names[desired_property] is not None:
+            if desired_property in CoolProp_names:
                 output = PropsSI(
                     CoolProp_names[desired_property],
                     first_property,
