@@ -25,67 +25,60 @@ CoolProp_names = {
     "TCX": "CONDUCTIVITY",
     "CP": "CPMASS",
     "CV": "CVMASS",
-    "D" :"D"
+    "D" :"D",
+    "H" : "HMASS"
 }
 
 def getfluidproperty(
-    fluid,
-    desired_property,
-    first_property,
-    first_value,
-    second_property,
-    second_value,
-    BASE= MASS_BASE_SI,
-    backend = backend
-    ):
-    """
-    Returns desired property in SI units
-    All inputs in REFPROP syntax
-    fluid: name of fluid, string
-    desired_property: property tag, string
-    first_property: first of 2 thermo properties, string
-    first_value: value of first thermo property, SI units
-    second_property: second of 2 thermo properties, string
-    second_value: value of second thermo property, SI units
-    BASE: default is MASS BASE, other option is MOLAR_BASE_SI
-    backend: set by file, but options are "REFPROP" or "CoolProp"
-    """
+    
+        fluid,
+        desired_property,
+        first_property,
+        first_value,
+        second_property,
+        second_value,
+        BASE= MASS_BASE_SI,
+        backend = backend
+        ):
+    try:
+        """
+        Returns desired property in SI units
+        All inputs in REFPROP syntax
+        fluid: name of fluid, string
+        desired_property: property tag, string
+        first_property: first of 2 thermo properties, string
+        first_value: value of first thermo property, SI units
+        second_property: second of 2 thermo properties, string
+        second_value: value of second thermo property, SI units
+        BASE: default is MASS BASE, other option is MOLAR_BASE_SI
+        backend: set by file, but options are "REFPROP" or "CoolProp"
+        """
 
-    if backend == "REFPROP":
-        output = RP.REFPROPdll(
-            fluid,
-            first_property+second_property,
-            desired_property,
-            BASE,
-            1,
-            0,
-            first_value,
-            second_value,
-            [1.0]
-        ).Output[0]
-    elif backend == "CoolProp":
-        if fluid == "CARBON DIOXIDE":
-            fluid = "CARBONDIOXIDE"
-        if desired_property == "CP/CV":
-            output = PropsSI(
-                "C",
-                first_property,
+        if backend == "REFPROP":
+            output = RP.REFPROPdll(
+                fluid,
+                first_property+second_property,
+                desired_property,
+                BASE,
+                1,
+                0,
                 first_value,
-                second_property,
                 second_value,
-                fluid
-            ) / PropsSI(
-                "O",
-                first_property,
-                first_value,
-                second_property,
-                second_value,
-                fluid
-            )
-        else:
-            if CoolProp_names[desired_property] is not None:
+                [1.0]
+            ).Output[0]
+        elif backend == "CoolProp":
+            if fluid == "CARBON DIOXIDE":
+                fluid = "CARBONDIOXIDE"
+            if desired_property == "CP/CV":
                 output = PropsSI(
-                    CoolProp_names[desired_property],
+                    "C",
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                ) / PropsSI(
+                    "O",
                     first_property,
                     first_value,
                     second_property,
@@ -93,15 +86,28 @@ def getfluidproperty(
                     fluid
                 )
             else:
-                output = PropsSI(
-                    desired_property,
-                    first_property,
-                    first_value,
-                    second_property,
-                    second_value,
-                    fluid
-                )
+                if desired_property in CoolProp_names:
+                    output = PropsSI(
+                        CoolProp_names[desired_property],
+                        first_property,
+                        first_value,
+                        second_property,
+                        second_value,
+                        fluid
+                    )
+                else:
+                    output = PropsSI(
+                        desired_property,
+                        first_property,
+                        first_value,
+                        second_property,
+                        second_value,
+                        fluid
+                    )
+    except Exception as e: 
+        print(e)
     return output
+
 #endregion getfluidproperty
 
 #region Lists of units supported
@@ -180,7 +186,7 @@ distance_units = [
 
 energy_units = [
     "W", 
-    "BTU",
+    "BTUphr",
 ]
 
 #endregion Lists of units supported
@@ -263,19 +269,19 @@ to_CdA = {
 
 #region Energy
 
-def BTU2W(BTU):
+def BTUphr2W(BTUphr):
     """
     Returns conversion to Watts from British Thermal Units
     BTU: number of BTUs
     """
-    return BTU * 1055.0559
+    return BTUphr * .293
 
-def W2BTU(W):
+def W2BTUphr(W):
     """
     Returns conversion to British Thermal Units from Watts 
     W: number of Ws
     """
-    return W / 1055.0559
+    return W / .293
 #endregion Energy
 #region area
 
@@ -628,10 +634,10 @@ from_sm = {
 }
 from_W = {
     "W" : same_unit, 
-    "BTU":W2BTU,
+    "BTU":W2BTUphr,
 }
 to_W = {
-    "BTU": BTU2W, 
+    "BTU": BTUphr2W, 
     "W": same_unit
 }
 #region convert
