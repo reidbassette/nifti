@@ -2,5 +2,7 @@
 /app.build
 /app.dist
 /app.onefile-build
-/app.exe
+
 /__pycache__
+/workspace.ipynb
+/app.exe

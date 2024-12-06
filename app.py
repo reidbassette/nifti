@@ -5,6 +5,7 @@
 # nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/nifti-splash-screen.png
 # nuitka-project: --windows-console-mode=disable
 # nuitka-project: --include-module=matplotlib
+# nuitka-project: --include-module=scipy
 # nuitka-project: --include-package-data=matplotlib
 # nuitka-project: --include-module=PIL
 # nuitka-project: --include-package-data=PIL
@@ -42,6 +43,7 @@ if "NUITKA_ONEFILE_PARENT" in os.environ:
 
    if os.path.exists(splash_filename):
       os.unlink(splash_filename)
+
 
 basedir = os.path.dirname(__file__)
 
@@ -89,11 +91,13 @@ class MyTableWidget(QWidget):
 
 
 def main():
-    app = QApplication([])
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
-
+    try:
+        app = QApplication([])
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e: 
+        print(e)
 if __name__ == '__main__':
     main()
 
