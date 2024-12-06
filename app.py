@@ -1,4 +1,5 @@
 # Compilation mode
+
 # nuitka-project: --standalone
 # nuitka-project: --onefile
 # nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/nifti-splash-screen.png
@@ -7,6 +8,7 @@
 # nuitka-project: --include-module=scipy
 # nuitka-project: --include-package-data=matplotlib
 # nuitka-project: --include-module=PIL
+# nuitka-project: --include-package-data=PIL
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/blowdown_diagram.jpg=blowdown_diagram.jpg
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/charging_diagram.png=charging_diagram.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/nifti-icon.png=nifti-icon.png

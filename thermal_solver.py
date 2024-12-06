@@ -230,6 +230,7 @@ def T_vs_t(t, t_eval, path, nodes):
                                     * path[P[j]].nodeB.V * path[P[j]].nodeB.c) if nodes[i].isothermal == False else 0
                                 )
             return dTdt 
+
         except Exception as e:
             print(e)
         

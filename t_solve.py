@@ -715,11 +715,13 @@ class thermalSolver(QWidget):
             #clear connected paths from last solve
             for node in self.backendNodes:
                 node.connectedPaths = []
+
             self.canvas.ax.clear()
             if (self.backendPaths == [] or self.backendNodes == []) and self.nodeTree.topLevelItemCount() > 1:
                 raise Exception
             elif self.backendNodes == []:
                 raise Exception
+
 
             timeUnit = self.timeUnits.currentText()
             temperatureUnits = self.temperatureUnits.currentText()
@@ -768,7 +770,7 @@ class thermalSolver(QWidget):
                 y =a.y 
                 for i in range(len(y[:,0])):
                     for j in range(len(y[0,:])):
-                         y[i,j] = unit_convert(y[i,j], "K", self.temperatureUnits.currentText())
+                        y[i,j] = unit_convert(y[i,j], "K", self.temperatureUnits.currentText())
                 for i in range(len(y[:,0])):
                     self.canvas.ax.plot(time, y[i,:])
                     legend.append(f"Node {self.backendNodes[i].identifier}")
@@ -1011,7 +1013,3 @@ def main():
 
 if __name__ == '__main__': 
     main()
-    app = QApplication([])
-    thermalSolve = MainWindow()
-    thermalSolve.show()
-    sys.exit(app.exec())
