@@ -25,7 +25,8 @@ from utilities import (
     mass_flow_units,
     fluid_names,
     flow_capacity_units,
-    density_units
+    density_units,
+    mass_units
 )
 
 class MainWindow(QMainWindow):
@@ -60,6 +61,7 @@ class Conversions(QWidget):
         window_layout.addWidget(VolumeConverter(self), 1, 4)
         window_layout.addWidget(FlowCapacityConverter(self), 2, 0)
         window_layout.addWidget(MassFlowConverter(self), 2, 2)
+        window_layout.addWidget(MassConverter(self), 2, 4)
 
 
         column_spacer = QSpacerItem(10,1)
@@ -115,6 +117,74 @@ class MassFlowConverter(QWidget):
 
         self.output_unit = QComboBox()
         self.output_unit.addItems(mass_flow_units)
+        layout.addWidget(self.output_unit)
+        
+        self.update_button = QPushButton("Update")
+        self.update_button.clicked.connect(self.update_button_clicked)
+        layout.addWidget(self.update_button)
+        layout.addItem(verticalSpacer)
+
+        self.setLayout(layout)
+
+    def update_button_clicked(self):
+        try:
+            self.output.setText(
+                '{:0.3e}'.format(
+                        unit_convert(
+                        float(self.input.text()),
+                        self.input_unit.currentText(),
+                        self.output_unit.currentText(),
+                        fluid=self.fluid_name.currentText()
+                    )
+                )
+            )
+        except:
+            self.output.setText("Didn't work")
+
+class MassConverter(QWidget):
+
+    def __init__(self, parent):
+        super(QWidget, self).__init__(parent)
+
+        layout = QVBoxLayout()
+        
+        self.title = QLabel("Mass")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.title.setFont(titlefont)
+        layout.addWidget(self.title)
+
+        self.fluid_label = QLabel("Fluid")
+        self.fluid_label.setFont(menufont)
+        layout.addWidget(self.fluid_label)
+
+        self.fluid_name = QComboBox()
+        self.fluid_name.addItems(fluid_names)
+        layout.addWidget(self.fluid_name)
+        
+        self.input_label = QLabel("Input")
+        self.input_label.setFont(menufont)
+        layout.addWidget(self.input_label)
+
+        self.input = QLineEdit()
+        self.input.selectedText()
+        layout.addWidget(self.input)
+
+        self.input_unit = QComboBox()
+        self.input_unit.addItems(mass_units)
+        layout.addWidget(self.input_unit)
+
+        self.output_label = QLabel("Output")
+        self.output_label.setFont(menufont)
+        layout.addWidget(self.output_label)
+
+        self.output = QLabel()
+        self.output.setFont(menufont)
+        self.output.selectedText()
+        self.output.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.output)
+
+        self.output_unit = QComboBox()
+        self.output_unit.addItems(mass_units)
         layout.addWidget(self.output_unit)
         
         self.update_button = QPushButton("Update")

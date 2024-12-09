@@ -7,6 +7,7 @@ import numpy as np
 from ctREFPROP.ctREFPROP import REFPROPFunctionLibrary
 from CoolProp.CoolProp import PropsSI
 import os
+
 backend = "REFPROP"
 try:
     RP = REFPROPFunctionLibrary(os.environ["RPPREFIX"])
@@ -17,72 +18,69 @@ except:
     backend = "CoolProp"
     MASS_BASE_SI = "NA"
 
+ 
 #Fluid Properties
-#start section
+#region getfluidproperty
 
 # CoolProp input dictionary
 CoolProp_names = {
-    "TCX": "CONDUCTIVITY"
+    "TCX": "CONDUCTIVITY",
+    "CP": "CPMASS",
+    "CV": "CVMASS",
+    "D" :"D",
+    "H" : "HMASS"
 }
 
 def getfluidproperty(
-    fluid,
-    desired_property,
-    first_property,
-    first_value,
-    second_property,
-    second_value,
-    BASE= MASS_BASE_SI,
-    backend = backend
-    ):
-    """
-    Returns desired property in SI units
-    All inputs in REFPROP syntax
-    fluid: name of fluid, string
-    desired_property: property tag, string
-    first_property: first of 2 thermo properties, string
-    first_value: value of first thermo property, SI units
-    second_property: second of 2 thermo properties, string
-    second_value: value of second thermo property, SI units
-    BASE: default is MASS BASE, other option is MOLAR_BASE_SI
-    backend: set by file, but options are "REFPROP" or "CoolProp"
-    """
+    
+        fluid,
+        desired_property,
+        first_property,
+        first_value,
+        second_property,
+        second_value,
+        BASE= MASS_BASE_SI,
+        backend = backend
+        ):
+    try:
+        """
+        Returns desired property in SI units
+        All inputs in REFPROP syntax
+        fluid: name of fluid, string
+        desired_property: property tag, string
+        first_property: first of 2 thermo properties, string
+        first_value: value of first thermo property, SI units
+        second_property: second of 2 thermo properties, string
+        second_value: value of second thermo property, SI units
+        BASE: default is MASS BASE, other option is MOLAR_BASE_SI
+        backend: set by file, but options are "REFPROP" or "CoolProp"
+        """
 
-    if backend == "REFPROP":
-        output = RP.REFPROPdll(
-            fluid,
-            first_property+second_property,
-            desired_property,
-            BASE,
-            1,
-            0,
-            first_value,
-            second_value,
-            [1.0]
-        ).Output[0]
-    elif backend == "CoolProp":
-        if fluid == "CARBON DIOXIDE":
-            fluid = "CARBONDIOXIDE"
-        if desired_property == "CP/CV":
-            output = PropsSI(
-                "C",
-                first_property,
+        if backend == "REFPROP":
+            output = RP.REFPROPdll(
+                fluid,
+                first_property+second_property,
+                desired_property,
+                BASE,
+                1,
+                0,
                 first_value,
-                second_property,
                 second_value,
-                fluid
-            ) / PropsSI(
-                "O",
-                first_property,
-                first_value,
-                second_property,
-                second_value,
-                fluid
-            )
-        else:
-            if CoolProp_names[desired_property] is not None:
+                [1.0]
+            ).Output[0]
+        elif backend == "CoolProp":
+            if fluid == "CARBON DIOXIDE":
+                fluid = "CARBONDIOXIDE"
+            if desired_property == "CP/CV":
                 output = PropsSI(
-                    CoolProp_names[desired_property],
+                    "C",
+                    first_property,
+                    first_value,
+                    second_property,
+                    second_value,
+                    fluid
+                ) / PropsSI(
+                    "O",
                     first_property,
                     first_value,
                     second_property,
@@ -90,20 +88,31 @@ def getfluidproperty(
                     fluid
                 )
             else:
-                output = PropsSI(
-                    desired_property,
-                    first_property,
-                    first_value,
-                    second_property,
-                    second_value,
-                    fluid
-                )
+                if desired_property in CoolProp_names:
+                    output = PropsSI(
+                        CoolProp_names[desired_property],
+                        first_property,
+                        first_value,
+                        second_property,
+                        second_value,
+                        fluid
+                    )
+                else:
+                    output = PropsSI(
+                        desired_property,
+                        first_property,
+                        first_value,
+                        second_property,
+                        second_value,
+                        fluid
+                    )
+    except Exception as e: 
+        print(e)
     return output
 
-# end section
+#endregion getfluidproperty
 
-# Lists of units supported
-#start section
+#region Lists of units supported
 fluid_names = [
     "AIR",
     "AMMONIA",
@@ -177,7 +186,12 @@ distance_units = [
     "in"
 ]
 
-#end section
+energy_units = [
+    "W", 
+    "BTUphr",
+]
+
+#endregion Lists of units supported
 
 # Unit conversions
 # start section
@@ -255,16 +269,23 @@ to_CdA = {
     "CdA": same_unit
 }
 
-# Energy
+#region Energy
 
-def BTU2W(BTU):
+def BTUphr2W(BTUphr):
     """
     Returns conversion to Watts from British Thermal Units
     BTU: number of BTUs
     """
-    return BTU * 1055.0559
+    return BTUphr * .293
 
-#area
+def W2BTUphr(W):
+    """
+    Returns conversion to British Thermal Units from Watts 
+    W: number of Ws
+    """
+    return W / .293
+#endregion Energy
+#region area
 
 def smm2sm(smm, *args):
     return smm * 1e-6
@@ -283,8 +304,8 @@ def sin2sm(sin, *args):
 
 def sm2sin(sm, *args):
     return sm / 0.00064516
-
-#volume
+#endregion area
+#region volume
 
 def cf2cm(cf, *args):
     return cf * 0.0283168466
@@ -309,7 +330,7 @@ def cin2cm(value, *args):
 
 def cm2cin(value, *args):
     return value * 61023.7441
-
+#endregion volume 
 to_cm = {
     "L": L2cm,
     "m^3": same_unit,
@@ -326,7 +347,126 @@ from_cm = {
     "in^3": cm2cin
 }
 
-#mass
+#mass flow rate
+
+def kgps2ncmphr(value, fluid):
+    return kg2nm(value, fluid) * 3600
+
+def ncmphr2kgps(value, fluid):
+    return nm2kg(value, fluid) / 3600
+
+def kgps2slpm(value, fluid):
+    return kg2sl(value, fluid) * 60
+
+def slpm2kgps(value, fluid):
+    return sl2kg(value, fluid) /60
+
+def kgps2scfm(value, fluid):
+    return kg2scf(value, fluid) * 60
+
+def scfm2kgps(value, fluid):
+    return scf2kg(value, fluid) / 60
+
+#region density
+
+def kgpcm2gpccm(value, *args):
+    return value * 1e-3
+
+def gpccm2kgpcm(value, *args):
+    return value * 1e3
+
+def kgpcm2lbpcf(value, *args):
+    return value * 0.0624279606
+
+def lbpcf2kgpcm(value, *args):
+    return value / 0.0624279606
+
+def kgpcm2lbpgal(value, *args):
+    return value * 0.0083454045
+
+def lbpgal2kgpcm(value, *args):
+    return value / 0.0083454045
+
+def kgpcm2lbpcin(value, *args):
+    return value * 0.0000361273
+
+def lbpcin2kgpcm(value, *args):
+    return value / 0.0000361273
+
+from_kgpcm = {
+    "kg/m^3": same_unit,
+    "g/cm^3": kgpcm2gpccm,
+    "lbm/ft^3": kgpcm2lbpcf,
+    "lbm/gal": kgpcm2lbpgal,
+    "lbm/in^3": kgpcm2lbpcin
+}
+
+to_kgpcm = {
+    "kg/m^3": same_unit,
+    "g/cm^3": gpccm2kgpcm,
+    "lbm/ft^3": lbpcf2kgpcm,
+    "lbm/gal": lbpgal2kgpcm,
+    "lbm/in^3": lbpcin2kgpcm
+}
+#endregion density
+#region pressure
+
+def psia2Pa(psia, *args):
+    return psia * 6894.75729
+
+def Pa2psia(Pa, *args):
+    return Pa / 6894.75729
+
+def psig2Pa(value, *args):
+    return psia2Pa(value + Pa2psia(101325))
+
+def Pa2psig(value, *args):
+    return Pa2psia(value) - Pa2psia(101325)
+
+def bara2Pa(value, *args):
+    return value*1e5
+
+def Pa2bara(value, *args):
+    return value/1e5
+
+def barg2Pa(value, *args):
+    return value*1e5 + 101325
+
+def Pa2barg(value, *args):
+    return value/1e5 - 1.01325
+
+def Pa2atm(value, *args):
+    return value / 101325
+
+def atm2Pa(value, *args):
+    return value * 101325
+
+#Temperature
+def Rank2K(Rank, *args):
+    return Rank * 5 / 9
+
+def K2Rank(K, *args):
+    return K * 9 / 5
+
+def Rank2F(Rank, *args):
+    return Rank - 459.67
+
+def F2Rank(F, *args):
+    return F + 459.67
+
+def K2C(K, *args):
+    return K-273.15
+
+def C2K(C, *args):
+    return C+273.15
+
+def F2K(F, *args):
+    return Rank2K(F2Rank(F))
+
+def K2F(K, *args):
+    return Rank2F(K2Rank(K))
+
+#region mass
 
 def kg2lb(kg, *args):
     return (kg * 2.204622476038)
@@ -430,127 +570,31 @@ def kg2scf(kg, fluid):
     )
     return cm2cf(kg / D_standard)
 
+mass_units = [
+    "kg",
+    "lbm",
+    "Nm^3",
+    "SL",
+    "SCF"
+]
 
-
-#mass flow rate
-
-def kgps2ncmphr(value, fluid):
-    return kg2nm(value, fluid) * 3600
-
-def ncmphr2kgps(value, fluid):
-    return nm2kg(value, fluid) / 3600
-
-def kgps2slpm(value, fluid):
-    return kg2sl(value, fluid) * 60
-
-def slpm2kgps(value, fluid):
-    return sl2kg(value, fluid) /60
-
-def kgps2scfm(value, fluid):
-    return kg2scf(value, fluid) * 60
-
-def scfm2kgps(value, fluid):
-    return scf2kg(value, fluid) / 60
-
-#density
-
-def kgpcm2gpccm(value, *args):
-    return value * 1e-3
-
-def gpccm2kgpcm(value, *args):
-    return value * 1e3
-
-def kgpcm2lbpcf(value, *args):
-    return value * 0.0624279606
-
-def lbpcf2kgpcm(value, *args):
-    return value / 0.0624279606
-
-def kgpcm2lbpgal(value, *args):
-    return value * 0.0083454045
-
-def lbpgal2kgpcm(value, *args):
-    return value / 0.0083454045
-
-def kgpcm2lbpcin(value, *args):
-    return value * 0.0000361273
-
-def lbpcin2kgpcm(value, *args):
-    return value / 0.0000361273
-
-from_kgpcm = {
-    "kg/m^3": same_unit,
-    "g/cm^3": kgpcm2gpccm,
-    "lbm/ft^3": kgpcm2lbpcf,
-    "lbm/gal": kgpcm2lbpgal,
-    "lbm/in^3": kgpcm2lbpcin
+to_kg = {
+    "kg": same_unit,
+    "lbm": lb2kg,
+    "Nm^3": nm2kg,
+    "SL": sl2kg,
+    "SCF": scf2kg
 }
 
-to_kgpcm = {
-    "kg/m^3": same_unit,
-    "g/cm^3": gpccm2kgpcm,
-    "lbm/ft^3": lbpcf2kgpcm,
-    "lbm/gal": lbpgal2kgpcm,
-    "lbm/in^3": lbpcin2kgpcm
+from_kg = {
+    "kg": same_unit,
+    "lbm": kg2lb,
+    "Nm^3": kg2nm,
+    "SL": kg2sl,
+    "SCF": kg2scf    
 }
 
-#pressure
-
-def psia2Pa(psia, *args):
-    return psia * 6894.75729
-
-def Pa2psia(Pa, *args):
-    return Pa / 6894.75729
-
-def psig2Pa(value, *args):
-    return psia2Pa(value + Pa2psia(101325))
-
-def Pa2psig(value, *args):
-    return Pa2psia(value) - Pa2psia(101325)
-
-def bara2Pa(value, *args):
-    return value*1e5
-
-def Pa2bara(value, *args):
-    return value/1e5
-
-def barg2Pa(value, *args):
-    return value*1e5 + 101325
-
-def Pa2barg(value, *args):
-    return value/1e5 - 1.01325
-
-def Pa2atm(value, *args):
-    return value / 101325
-
-def atm2Pa(value, *args):
-    return value * 101325
-
-#Temperature
-def Rank2K(Rank, *args):
-    return Rank * 5 / 9
-
-def K2Rank(K, *args):
-    return K * 9 / 5
-
-def Rank2F(Rank, *args):
-    return Rank - 459.67
-
-def F2Rank(F, *args):
-    return F + 459.67
-
-def K2C(K, *args):
-    return K-273.15
-
-def C2K(C, *args):
-    return C+273.15
-
-def F2K(F, *args):
-    return Rank2K(F2Rank(F))
-
-def K2F(K, *args):
-    return Rank2F(K2Rank(K))
-
+#endregion mass
 
 from_kgps = {
     "kg/s": same_unit,
@@ -613,7 +657,15 @@ from_sm = {
     "in^2": sm2sin,
     "ft^2": sm2sft
 }
-
+from_W = {
+    "W" : same_unit, 
+    "BTU":W2BTUphr,
+}
+to_W = {
+    "BTU": BTUphr2W, 
+    "W": same_unit
+}
+#region convert
 def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
     """
     Converts value1 from unit1 to unit2
@@ -646,6 +698,12 @@ def unit_convert(value1, unit1, unit2, fluid="AIR", Cd=1.0):
     elif unit1 in density_units and unit2 in density_units:
         kgpcm = to_kgpcm[unit1](value1)
         value2 = from_kgpcm[unit2](kgpcm)
+    elif unit1 in energy_units and unit2 in energy_units: 
+        W = to_W[unit1](value1)
+        value2 = from_W[unit2](W)
+    elif unit1 in mass_units and unit2 in mass_units:
+        kg = to_kg[unit1](value1, fluid)
+        value2 = from_kg[unit2](kg, fluid)
     else: 
         print("Not a valid combination")
         value2 = 1

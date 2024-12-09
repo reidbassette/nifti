@@ -1,4 +1,3 @@
-
 import os, sys
 
 from PyQt6.QtWidgets import (
@@ -13,7 +12,9 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QSizePolicy,
     QMainWindow,
-    QApplication
+    QApplication,
+    QCheckBox,
+    QTabWidget
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
@@ -56,11 +57,15 @@ class ChargingCalculator(QWidget):
         super(QWidget, self).__init__(parent)
 
         self.canvas = MplCanvas(self, width=5,height=4, dpi=100)
+        self.canvas2 = MplCanvas(self, width=5, height=4, dpi=100)
         outerlayout = QHBoxLayout()
         
         layout = QVBoxLayout()
         layout2 = QVBoxLayout()
 
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.canvas, "Pressure")
+        self.tabs.addTab(self.canvas2, "Flow Rate")
         #Add list of fluid names
 
         self.fluid_name_label = QLabel("Fluid")
@@ -168,6 +173,8 @@ class ChargingCalculator(QWidget):
         self.update_button = QPushButton('Update Plot')
         self.update_button.clicked.connect(self.update_button_clicked)
 
+        self.minor_grid_checkbox = QCheckBox('Minor Grid On')
+
         #Save Report
         self.report_button = QPushButton('Save Report')
         self.report_button.clicked.connect(self.report_button_clicked)
@@ -203,13 +210,14 @@ class ChargingCalculator(QWidget):
         layout.addWidget(self.vessel_temperature)
         layout.addWidget(self.orifice_area_label)
         layout.addWidget(self.orifice_area)
+        layout.addWidget(self.minor_grid_checkbox)
         layout.addWidget(self.update_button)
         layout.addWidget(self.mass_flow_rate)
         layout.addWidget(self.report_button)
         layout.addItem(verticalSpacer)
 
         layout2.addWidget(self.diagram, 1)
-        layout2.addWidget(self.canvas, 2)
+        layout2.addWidget(self.tabs, 2)
 
         outerlayout.addLayout(layout, 1)
         outerlayout.addLayout(layout2, 2)
@@ -246,6 +254,18 @@ class ChargingCalculator(QWidget):
     def updateLabel(self, s):
         self.mass_flow_rate.setText(f'{s}')
 
+    def update_flow_plot(self, time_series, flow_series, time_units):
+        self.canvas2.axes.cla()
+        self.canvas2.axes.plot(time_series, flow_series)
+        self.canvas2.axes.set_ylabel("Flow Rate, " + self.mass_flow_units.currentText())
+        self.canvas2.axes.set_xlabel("Time, " + str(time_units))
+        self.canvas2.axes.set_title("Flow Rate vs. Time")
+        self.canvas2.axes.grid(True)
+        if self.minor_grid_checkbox.isChecked():
+            self.canvas2.axes.minorticks_on()
+            self.canvas2.axes.grid(True, which='minor')
+        self.canvas2.draw()
+
     def update_pressure_plot(self, time_series, pressure_series, time_units):
         """
         update plot
@@ -256,6 +276,9 @@ class ChargingCalculator(QWidget):
         self.canvas.axes.set_xlabel("Time, " + str(time_units))
         self.canvas.axes.set_title("Vessel Pressure vs. Time")
         self.canvas.axes.grid(True)
+        if self.minor_grid_checkbox.isChecked():
+            self.canvas.axes.minorticks_on()
+            self.canvas.axes.grid(True, which='minor')
         self.canvas.draw()
 
     def update_button_clicked(self):
@@ -339,6 +362,7 @@ class ChargingCalculator(QWidget):
                 fluid=self.fluid_name_selection.currentText()
             )
             P = np.zeros(len(soln.y[1]))
+            mdot = np.zeros(len(soln.y[1]))
             for i in range(len(soln.y[1])):
                 P[i] = unit_convert(
                     getfluidproperty(
@@ -356,6 +380,46 @@ class ChargingCalculator(QWidget):
                     "Pa",
                     self.pressure_units.currentText()
                 )
+                mdot[i] = unit_convert(
+                    mdotidealgas(
+                        upstream_pressure=unit_convert(
+                            float(self.pressure_input.text()),
+                            self.pressure_units.currentText(),
+                            "Pa"
+                        ),
+                        upstream_density= getfluidproperty(
+                            self.fluid_name_selection.currentText(),
+                            "D",
+                            "P",
+                            unit_convert(
+                                float(self.pressure_input.text()),
+                                self.pressure_units.currentText(),
+                                "Pa"
+                            ),
+                            "T",
+                            unit_convert(
+                                float(self.temperature_input.text()),
+                                self.temperature_units.currentText(),
+                                "K"
+                            )
+                        ),
+                        downstream_pressure=unit_convert(
+                            float(P[i]),
+                            self.pressure_units.currentText(),
+                            "Pa"
+                        ),
+                        CdA=unit_convert(
+                            float(self.orifice_area.text()),
+                            self.area_units.currentText(),
+                            "m^2"
+                        ),
+                        fluid=self.fluid_name_selection.currentText()
+                    ),
+                    "kg/s",
+                    self.mass_flow_units.currentText(),
+                    fluid=self.fluid_name_selection.currentText()
+                )
+                
             if soln.t_events[0] > 1800:
                 t = soln.t / 60
                 time_units = "mins"
@@ -364,6 +428,7 @@ class ChargingCalculator(QWidget):
                 time_units = "s"
             # update the pressure vs time plot
             self.update_pressure_plot(t, P, time_units)
+            self.update_flow_plot(t, mdot, time_units)
             # update the peak mass flow rate text
             self.mass_flow_rate.setText(
                 "Peak mass flow rate: " 
@@ -410,9 +475,9 @@ class ChargingCalculator(QWidget):
                 ) 
                 + " " + str(self.mass_flow_units.currentText())
             )
-        except:
+        except Exception as ex:
             self.mass_flow_rate.setText(
-                "Invalid inputs or other error"
+                "Invalid inputs or other error \n Error Message: " + str(ex)
             )
 
     def report_button_clicked(self):

@@ -1,19 +1,19 @@
 # Compilation mode
+
 # nuitka-project: --standalone
 # nuitka-project: --onefile
 # nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/nifti-splash-screen.png
+# nuitka-project: --windows-console-mode=disable
 # nuitka-project: --include-module=matplotlib
+# nuitka-project: --include-module=scipy
 # nuitka-project: --include-package-data=matplotlib
 # nuitka-project: --include-module=PIL
+# nuitka-project: --include-package-data=PIL
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/blowdown_diagram.jpg=blowdown_diagram.jpg
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/charging_diagram.png=charging_diagram.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/nifti-icon.png=nifti-icon.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/orifice_diagram.png=orifice_diagram.png
 # nuitka-project: --enable-plugin=pyqt6
-# nuitka-project: --windows-console-mode=disable
-
-
-
 
 
 import sys
@@ -31,6 +31,7 @@ from bd_calc import BlowdownCalculator
 from charging_calc import ChargingCalculator
 from conversions import Conversions
 from orifice_calc import OrificeTableWidget
+from t_solve import thermalSolver
 
 # Signal splash screen removal
 
@@ -42,6 +43,7 @@ if "NUITKA_ONEFILE_PARENT" in os.environ:
 
    if os.path.exists(splash_filename):
       os.unlink(splash_filename)
+
 
 basedir = os.path.dirname(__file__)
 
@@ -75,11 +77,13 @@ class MyTableWidget(QWidget):
         self.tab2 = BlowdownCalculator(self)
         self.tab3 = ChargingCalculator(self)
         self.tab4 = Conversions(self)
+        self.tab5 = thermalSolver(self)
 
         self.tabs.addTab(self.tab1, "Orifice Calculator")
         self.tabs.addTab(self.tab2, "Blowdown Calculator")
         self.tabs.addTab(self.tab3, "Charging Calculator")
         self.tabs.addTab(self.tab4, "Unit Conversions")
+        self.tabs.addTab(self.tab5, "Thermal Calculator")
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
@@ -87,10 +91,13 @@ class MyTableWidget(QWidget):
 
 
 def main():
-    app = QApplication([])
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
-
+    try:
+        app = QApplication([])
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e: 
+        print(e)
 if __name__ == '__main__':
     main()
+
