@@ -21,13 +21,16 @@ import thermal_solver as t
 from PyQt6.QtCore import Qt
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 import numpy as np
-
+from fractions import Fraction
 
 class MplCanvas(FigureCanvas):
     
     def __init__(self, parent=None, width=5, height=4, dpi=100):
-            fig, self.ax = plt.subplots(figsize=(width, height), dpi=dpi)
+            fig = Figure(figsize=(width, height), dpi = dpi) 
+            self.ax = fig.add_subplot(111)
+            # self.ax = plt.subplots(figsize=(width, height), dpi=dpi)
             super(MplCanvas, self).__init__(fig) # Set the parent widget to make it behave like a QWidget
 
         
@@ -38,8 +41,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.title = 'Thermal Solver'
         self.setWindowTitle(self.title)
-        # self.setGeometry(100,25,900,300)
-        # self.setBaseSize(1200,1000)
         self.table_widget = thermalSolver(self)
         self.setCentralWidget(self.table_widget)
 
@@ -47,7 +48,7 @@ class MainWindow(QMainWindow):
 class thermalSolver(QWidget): 
     
     def __init__(self,parent):
-
+        super().__init__()
         super(QWidget, self).__init__(parent)
         self.nodes = {}
         self.paths = {}
@@ -76,7 +77,7 @@ class thermalSolver(QWidget):
         self.volumeLabel = QLabel("NODE VOLUME, " + str(volume_units[0])) 
         self.heatGeneratedLabel = QLabel("INTERNAL HEAT GENERATION, " + str(energy_units[0]))
         self.emissivityLabel= QLabel("EMISSIVITY")
-        self.absorbivityLabel = QLabel("ABSORBTIVITY")
+        self.absorbivityLabel = QLabel("ABSORPTIVITY")
         self.isothermalLabel = QLabel("ISOTHERMAL")
         self.pressureUnitsLabel = QLabel("Pressure Units")
         self.temperatureUnitsLabel = QLabel("Temperature Units")
@@ -96,12 +97,21 @@ class thermalSolver(QWidget):
         self.dxLabel.setVisible(False)
         self.energyUnitsLabel = QLabel("Energy Units")
         self.areaUnitsLabel = QLabel("Area Units")
+        self.densityUnitsLabel = QLabel("Density Units")
         self.distanceUnitsLabel = QLabel("Distance Units")
         self.timeUnitsLabel = QLabel("Time Units")
         self.heatTransferModeLabel = QLabel("HEAT TRANSFER MODE")
+        self.ConductivityLabel = QLabel("NODE CONDUCTIVITY, W/m-K")
+        self.ConductivityLabel.setVisible(False)
+        self.DensityLabel = QLabel("NODE DENSITY, " + str(density_units[0]))
+        self.DensityLabel.setVisible(False)
+        self.SpecificHeatCapacityLabel = QLabel("NODE SPECIFIC HEAT CAPACITY, J/kg-K")
+        self.SpecificHeatCapacityLabel.setVisible(False)
+
         #endregion LABELS
 
         #region UNIT DROPDOWN MENUS
+        #All this region does is setup the dropdown menus for unit conversions. See the method calls in the UPDATE METHODS SECTION
         self.pressureUnits = QComboBox()
         self.pressureUnits.addItems(pressure_units)
         self.pressureUnits.currentTextChanged.connect(self.updatePressureUnits)
@@ -129,6 +139,10 @@ class thermalSolver(QWidget):
         self.timeUnits = QComboBox()
         self.timeUnits.addItems(["s", "min", "hr"])
         self.timeUnits.currentTextChanged.connect(self.updateTimeUnits)
+
+        self.densityUnits = QComboBox()
+        self.densityUnits.addItems(density_units)
+        self.densityUnits.currentTextChanged.connect(self.updateDensityUnits)
         #endregion UNIT DROPDOWN MENUS
         
         #region OUTPUT TEXT PRINTING 
@@ -137,6 +151,7 @@ class thermalSolver(QWidget):
         #endregion OUTPUT TEXT PRINTING
 
         #region NODE ATTRIBUTE SELECTIONS
+        #This region sets up the node attribute selection 
         self.currentNodeSelection = QSpinBox()
         self.currentNodeSelection.setRange(1,1)
 
@@ -147,11 +162,15 @@ class thermalSolver(QWidget):
         self.mediumTypeSelection.addItems(["FLUID","SOLID"])
         self.mediumTypeSelection.setCurrentIndex(-1)
         self.mediumTypeSelection.setPlaceholderText("Select")
+        #Automatically toggles the SOLID or FLUID mediums depending on the medium type that was selected
         self.mediumTypeSelection.currentTextChanged.connect(self.changeMediumSelectionItems)
         self.mediumTypeSelection.currentTextChanged.connect(self.toggleSolidProperties)
         
+
         self.mediumSelection = QComboBox()
         self.mediumSelection.setPlaceholderText("Select")
+        #Sets Custom property boxes visible if the custom material entry is selected. 
+        self.mediumSelection.currentTextChanged.connect(self.customMaterialEntry)
         
         self.pressureInput = QLineEdit()
         self.pressureInput.setPlaceholderText("200")
@@ -171,7 +190,20 @@ class thermalSolver(QWidget):
         self.isothermalInput = QComboBox()
         self.isothermalInput.addItems(["True", "False"])
         self.isothermalInput.setCurrentIndex(1)
+        #defaults to false, however if isothermal condiition is changed, update attribute selections
         self.isothermalInput.currentTextChanged.connect(self.toggleIsothermal)
+
+        self.ConductivityInput = QLineEdit()
+        self.ConductivityInput.setPlaceholderText('13')
+        self.ConductivityInput.setVisible(False)
+
+        self.DensityInput = QLineEdit()
+        self.DensityInput.setPlaceholderText('1000')
+        self.DensityInput.setVisible(False)
+
+        self.SpecificHeatCapacityInput = QLineEdit()
+        self.SpecificHeatCapacityInput.setPlaceholderText('500')
+        self.SpecificHeatCapacityInput.setVisible(False)
         #endregion NODE ATTRIBUTE SELECTIONS
 
         #region PATH ATTRIBUTE SELECTIONS
@@ -182,7 +214,7 @@ class thermalSolver(QWidget):
         self.heatTransferModeInput.addItems(["CONVECTION", "CONDUCTION"])
         self.heatTransferModeInput.setCurrentIndex(-1)
         self.heatTransferModeInput.setPlaceholderText("Select")
-
+        #If heat transfer mode input is switched between conduction and convection, update available properties accordingly
         self.heatTransferModeInput.currentTextChanged.connect(self.toggleHeatTransferProperties)
         self.heatTransferCoefficientInput = QLineEdit()
         self.heatTransferCoefficientInput.setPlaceholderText("10")
@@ -197,9 +229,6 @@ class thermalSolver(QWidget):
         #endregion PATH ATTRIBUTE SELECTIONS
 
         #region TIME INPUT 
-        # self.timeInitialInput = QLineEdit()
-        # self.timeInitialInput.setPlaceholderText("0")
-
         self.timeDurationInput = QLineEdit()
         self.timeDurationInput.setPlaceholderText("3600")
         #endregion TIME INPUT
@@ -235,6 +264,7 @@ class thermalSolver(QWidget):
         self.connectedNodesSelection2 = QComboBox()
         self.connectedNodesSelection1.setCurrentIndex(-1)
         self.connectedNodesSelection2.setCurrentIndex(-1) 
+        #if a node item is changed, update the possible selections of the other box accordingly. The same node cannot be selected twice.
         self.connectedNodesSelection1.currentIndexChanged.connect(self.changeNodeSelectionItems)
         #endregion NODE AND PATH SELECTIONS
 
@@ -254,6 +284,15 @@ class thermalSolver(QWidget):
         self.attributeLayout.addWidget(self.mediumLabel)
         self.attributeLayout.addWidget(self.mediumSelection)
         
+        self.attributeLayout.addWidget(self.DensityLabel)
+        self.attributeLayout.addWidget(self.DensityInput)
+        
+        self.attributeLayout.addWidget(self.ConductivityLabel)
+        self.attributeLayout.addWidget(self.ConductivityInput)
+
+        self.attributeLayout.addWidget(self.SpecificHeatCapacityLabel)
+        self.attributeLayout.addWidget(self.SpecificHeatCapacityInput)
+
         self.attributeLayout.addWidget(self.volumeLabel)
         self.attributeLayout.addWidget(self.volumeInput)
 
@@ -299,6 +338,8 @@ class thermalSolver(QWidget):
         self.timeEvalAndUnitLayout.addWidget(self.pressureUnits)
         self.timeEvalAndUnitLayout.addWidget(self.temperatureUnitsLabel)
         self.timeEvalAndUnitLayout.addWidget(self.temperatureUnits)
+        self.timeEvalAndUnitLayout.addWidget(self.densityUnitsLabel)
+        self.timeEvalAndUnitLayout.addWidget(self.densityUnits)
         self.timeEvalAndUnitLayout.addWidget(self.volumeUnitsLabel)
         self.timeEvalAndUnitLayout.addWidget(self.volumeUnits)
         self.timeEvalAndUnitLayout.addWidget(self.energyUnitsLabel)
@@ -326,7 +367,7 @@ class thermalSolver(QWidget):
         #endregion PLOT LAYOUT
         
         #region BUTTONS
-        
+        #If a button is pressed, update the corresponing Node, solve, or clear the app data
         self.updateNodeButton = QPushButton("Update Node")
 
         self.updateNodeButton.pressed.connect(self.updateNode)
@@ -369,7 +410,9 @@ class thermalSolver(QWidget):
         self.setLayout(self.outerLayout)
         #endregion SET OUTER LAYOUT
 
-    '''Set Node Selection based on foregoing Node Selection for path (i.e sets selsection for Node B)'''
+
+    #region METHODS
+    '''Set Node Selection based on foregoing Node Selection for path (i.e sets selection for Node B)'''
     def setNodeSelection(self): 
         #Clear selected Nodes
         self.connectedNodesSelection1.clear()
@@ -390,54 +433,102 @@ class thermalSolver(QWidget):
     #region NODE AND PATH UPDATE METHODS
     def updateNode(self):
         try:
-            if self.nodeTree.topLevelItemCount() == 10:
+            if self.nodeTree.topLevelItemCount() == 15:
                 self.outputText.setVisible(True)
                 self.outputText.setText("Maximum number of nodes exceeded(10)")
                 return 1
             items = []
             self.nodeTree.clear()
-            attributes = [
-                "T," + (self.temperatureInput.text()) +':'+self.temperatureUnits.currentText(), 
-                "MEDIUM,"+self.mediumSelection.currentText()+':', 
-                "VOLUME," + (self.volumeInput.text()) +':'+ self.volumeUnits.currentText()if self.isothermalInput.currentText() == "False" else '', 
-                "HEAT GENERATED," + (self.heatGeneratedInput.text()) + ':'+self.energyUnits.currentText() if self.heatGeneratedInput.text() != '' else '', 
-                "PRESSURE,"+ (self.pressureInput.text()) + ':'+self.pressureUnits.currentText() if self.mediumTypeSelection.currentText() == "FLUID" else '' , 
-                "EMISSIVITY," + (self.emissivityInput.text()) +':'if self.mediumTypeSelection.currentText() == "SOLID" else '', 
-                "ABSORPTIVITY,"+(self.absorbivityInput.text()) +':'if self.mediumTypeSelection.currentText() == "SOLID" else '',
-                "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':'
-            ]
+            #Sets attribute list depending on node conditions.
+            if self.mediumTypeSelection.currentText() == 'SOLID' and self.isothermalInput.currentText() == 'True': 
+                attributes = [
+                    "T," + (self.temperatureInput.text()) +':'+self.temperatureUnits.currentText(), 
+                    "MEDIUM,"+self.mediumSelection.currentText()+':', 
+                    "EMISSIVITY," + (self.emissivityInput.text()) +':',
+                    "ABSORPTIVITY,"+(self.emissivityInput.text()) +':',#Kirchoff's Law
+                    "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':',
+                    "DENSITY," + (self.DensityInput.text()) + ':' + self.densityUnits.currentText() if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                    "THERMAL CONDUCTIVTIY," + (self.ConductivityInput.text()) + ':' + 'W/m-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                    "SPECIFIC HEAT CAPACITY," + (self.SpecificHeatCapacityInput.text()) + ':' + 'J/kg-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                ]
+            elif self.mediumTypeSelection.currentText() == 'SOLID' and self.isothermalInput.currentText() == 'False':
+                attributes = [
+                    "T," + (self.temperatureInput.text()) +':'+self.temperatureUnits.currentText(), 
+                    "MEDIUM,"+self.mediumSelection.currentText()+':', 
+                 
+                    "EMISSIVITY," + (self.emissivityInput.text()) +':',
+                    "ABSORPTIVITY,"+(self.absorbivityInput.text()) +':',
+                    "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':',
+                    "DENSITY," + (self.DensityInput.text()) + ':' + self.densityUnits.currentText() if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                    "THERMAL CONDUCTIVTIY," + (self.ConductivityInput.text()) + ':' + 'W/m-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                    "SPECIFIC HEAT CAPACITY," + (self.SpecificHeatCapacityInput.text()) + ':' + 'J/kg-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
+                    "VOLUME," + (self.volumeInput.text()) +':'+ self.volumeUnits.currentText(), #change 
+                    "HEAT GENERATED," + (self.heatGeneratedInput.text()) + ':'+self.energyUnits.currentText(), 
+                ]
+            elif self.mediumTypeSelection.currentText() == 'FLUID' and self.isothermalInput.currentText() == 'False': 
+                attributes = [
+                    "T," + (self.temperatureInput.text()) + ':' + self.temperatureUnits.currentText(), 
+                    "MEDIUM," + self.mediumSelection.currentText() + ':', 
+                    "VOLUME," + (self.volumeInput.text()) + ':' + self.volumeUnits.currentText(),
+                    "HEAT GENERATED," + (self.heatGeneratedInput.text()) + ':' + self.energyUnits.currentText(),
+                    "PRESSURE,"+ (self.pressureInput.text()) + ':'+self.pressureUnits.currentText(),
+                    "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':',
+                ]    
+            elif self.mediumTypeSelection.currentText() == 'FLUID' and self.isothermalInput.currentText() == 'True': 
+                attributes = [
+                    "T," + (self.temperatureInput.text()) + ':' + self.temperatureUnits.currentText(), 
+                    "MEDIUM," + self.mediumSelection.currentText() + ':', 
+                    "PRESSURE,"+ (self.pressureInput.text()) + ':'+self.pressureUnits.currentText(),
+                    "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':',
+                ]
 
             '''Stores node in backend nodes and updates nodes using identifier attribute'''
             self.backendNodes = [node for node in self.backendNodes if node.identifier != self.currentNodeSelection.value()]
-            self.backendNodes.append(t.Node(
-    
-                T = unit_convert(
-                    float(self.temperatureInput.text()), 
-                    self.temperatureUnits.currentText(),
-                    "K"
-                ) if self.temperatureInput.text() != '' else '',
 
-                medium= self.mediumSelection.currentText(),
-                medium_type=self.mediumTypeSelection.currentText() if self.mediumTypeSelection.currentText() != '' else "SOLID",
-                Pressure= unit_convert(
-                    float(self.pressureInput.text()),
-                    self.pressureUnits.currentText(), 
-                    "Pa", 
-                ) if self.mediumTypeSelection.currentText() == 'FLUID' else 0.0,
-                Eg = unit_convert(
-                    float(self.heatGeneratedInput.text()),
-                    self.energyUnits.currentText(), 
-                    "W",
-                ) if self.heatGeneratedInput.text() != '' or self.isothermalInput == False else 0.0, 
-                V= unit_convert(
-                    float(self.volumeInput.text()),
-                    self.volumeUnits.currentText(),
-                    "m^3",
-                ) if self.isothermalInput.currentText() == "False" else 0.0, 
-                #remove emissivity input
-                isothermal= eval(self.isothermalInput.currentText()) if self.isothermalInput.currentText() != '' else False,
-                identifier=self.currentNodeSelection.value()
-                ))
+            #region Attributes
+            T = unit_convert(float(self.temperatureInput.text()), self.temperatureUnits.currentText(),"K") 
+            medium = self.mediumSelection.currentText()
+            medium_type = self.mediumTypeSelection.currentText()
+            Pressure = unit_convert(float(self.pressureInput.text()), self.pressureUnits.currentText(), "Pa") if medium_type == 'FLUID' else 0.0
+            Eg = unit_convert(float(self.heatGeneratedInput.text()), self.energyUnits.currentText(), "W") if self.isothermalInput.currentText() == 'False' else 0.0
+            V = unit_convert(float(self.volumeInput.text()), self.volumeUnits.currentText(), "m^3") if self.isothermalInput.currentText() == 'False' else 0.0
+            e = float(self.emissivityInput.text()) if medium_type == 'SOLID' else 0.0
+            a = float(self.absorbivityInput.text()) if medium_type == 'SOLID' and self.isothermalInput.currentText() == 'False' else 0.0
+            isothermal= eval(self.isothermalInput.currentText()) 
+            identifier=self.currentNodeSelection.value()
+            density=unit_convert(float(self.DensityInput.text()), self.densityUnits.currentText(), 'kg/m^3') if medium == 'CUSTOM' else 0.0
+            k = float(self.ConductivityInput.text()) if medium == 'CUSTOM' else 0.0
+            c = float(self.SpecificHeatCapacityInput.text())if medium == 'CUSTOM' else 0.0
+
+            if self.mediumTypeSelection.currentText() == 'SOLID': 
+                self.backendNodes.append(t.Node(
+                    T = T,
+                    medium= medium,
+                    medium_type=medium_type,
+                    Eg = Eg,
+                    V= V if self.isothermalInput.currentText() == "False" else 0.0, 
+                    e = e,
+                    a = a if self.isothermalInput.currentText() == 'False' else e,
+                    isothermal= isothermal,
+                    identifier=identifier,
+                    density=density,
+                    k = k,
+                    c = c
+                    ))
+                
+            elif self.mediumTypeSelection.currentText() == 'FLUID':
+                self.backendNodes.append(t.Node(
+                    T = T,
+                    medium=medium,
+                    medium_type=medium_type,
+                    Eg = Eg,
+                    Pressure= Pressure,
+                    V= V if self.isothermalInput.currentText() == "False" else 0.0, 
+                    e = e,
+                    a = a,
+                    isothermal= isothermal,
+                    identifier=identifier
+                    ))
 
             #Create Node Dictionary
             self.nodes['Node ' + str(self.currentNodeSelection.value())] = attributes
@@ -485,23 +576,25 @@ class thermalSolver(QWidget):
     def updatePath(self): 
         try:
             '''First checks if path already exists AND is not updating pre-existing path'''
-            nume1 = int(self.connectedNodesSelection1.currentText().split(' ')[-1])
-            denom1 = int(self.connectedNodesSelection2.currentText().split(' ')[-1])
+            nume1 = self.connectedNodesSelection1.currentText().split(' ')[-1]
+            denom1 = self.connectedNodesSelection2.currentText().split(' ')[-1]
+            frac1 = nume1 + '/' + denom1
+            frac1inverse = denom1 + '/' + nume1
+            self.outputText.setVisible(True)
             
             print(self.pathTree.topLevelItemCount())
             for i in range(self.pathTree.topLevelItemCount()):
-                nume2 = int(self.paths[self.pathTree.topLevelItem(i).text(0)][0].split(' ')[-1].split(':')[0])
-                denom2 = int(self.paths[self.pathTree.topLevelItem(i).text(0)][1].split(' ')[-1].split(':')[0])   
-                prod = (nume1/denom1)*(nume2/denom2) 
-                if (self.pathTree.topLevelItem(i).text(0).split(' ')[-1] != self.currentPathSelection.text()) and (prod == (nume2/denom2)**2 or prod == 1):  
-                    self.outputText.setText("Path already exists")
+                nume2 = self.paths[self.pathTree.topLevelItem(i).text(0)][0].split(' ')[-1].split(':')[0]
+                denom2 = self.paths[self.pathTree.topLevelItem(i).text(0)][1].split(' ')[-1].split(':')[0]   
+                frac2 = nume2 + '/' + denom2
+                if (self.pathTree.topLevelItem(i).text(0).split(' ')[-1] != self.currentPathSelection.text()) and (frac1 == frac2 or frac1inverse == frac2):  
+                    self.outputText.setText("Path already exists.")
                     return 1
                 
             self.pathTree.clear()
             attributes =[ 
                 "Node A," + self.connectedNodesSelection1.currentText()+":",
                 "Node B," + self.connectedNodesSelection2.currentText()+':',
-                
                 "Area," + self.heatTransferAreaInput.text()+':'+ self.areaUnits.currentText(),
                 "dx," + self.dxInput.text()+':' +self.distanceUnits.currentText() if self.heatTransferModeInput.currentText() == "CONDUCTION" else '',
                 "h," + self.heatTransferCoefficientInput.text() +':'+ 'W/m^2K' if self.heatTransferModeInput.currentText() == "CONVECTION" else '',
@@ -565,7 +658,7 @@ class thermalSolver(QWidget):
     def changeMediumSelectionItems(self): 
         self.mediumSelection.clear()
         if self.mediumTypeSelection.currentText() == "SOLID": 
-            self.mediumSelection.addItems(["SS316", "Al6061", "Al7075T6"])
+            self.mediumSelection.addItems(["SS316", "Al6061", "Al7075T6","CUSTOM"])
             self.mediumSelection.setCurrentIndex(-1)
 
         elif self.mediumTypeSelection.currentText() == "FLUID":
@@ -589,8 +682,8 @@ class thermalSolver(QWidget):
             self.pressureInput.setVisible(False)
             self.emissivityLabel.setVisible(True)
             self.emissivityInput.setVisible(True)
-            self.absorbivityLabel.setVisible(True)
-            self.absorbivityInput.setVisible(True)
+            self.absorbivityLabel.setVisible(True) if self.isothermalInput.currentText() == 'False' else self.absorbivityLabel.setVisible(False)
+            self.absorbivityInput.setVisible(True) if self.isothermalInput.currentText() == 'False' else self.absorbivityInput.setVisible(False)
         elif self.mediumTypeSelection.currentText() == "FLUID":
             self.pressureLabel.setVisible(True)
             self.pressureInput.setVisible(True)
@@ -598,25 +691,37 @@ class thermalSolver(QWidget):
             self.emissivityInput.setVisible(False)
             self.absorbivityLabel.setVisible(False)
             self.absorbivityInput.setVisible(False)
+    #region isothermal
     def toggleIsothermal(self): 
         if self.isothermalInput.currentText() == "True":
             self.volumeLabel.setVisible(False)
             self.volumeInput.setVisible(False)
             self.heatGeneratedLabel.setVisible(False)
             self.heatGeneratedInput.setVisible(False)
+            self.absorbivityLabel.setVisible(False)
+            self.absorbivityInput.setVisible(False)
         else:
             self.volumeLabel.setVisible(True)
             self.volumeInput.setVisible(True)
             self.heatGeneratedLabel.setVisible(True)
             self.heatGeneratedInput.setVisible(True)
-
-    #Solves Problem
+            if self.mediumTypeSelection.currentText() == "SOLID":
+                self.absorbivityLabel.setVisible(True)
+                self.absorbivityInput.setVisible(True)
+    #endregion isothermal
+    #region Solves Problem
     def solve(self): 
         try:
             #clear connected paths from last solve
             for node in self.backendNodes:
                 node.connectedPaths = []
-            self.canvas.ax.cla()
+
+            self.canvas.ax.clear()
+            if (self.backendPaths == [] or self.backendNodes == []) and self.nodeTree.topLevelItemCount() > 1:
+                raise Exception
+            elif self.backendNodes == []:
+                raise Exception
+
 
             timeUnit = self.timeUnits.currentText()
             temperatureUnits = self.temperatureUnits.currentText()
@@ -639,15 +744,27 @@ class thermalSolver(QWidget):
             teval = np.linspace(tspan[0], tspan[1],10000)
             a = 0
             legend = []
+            time = teval/timeScaleFactor
             #For single node case. Want to see how long it takes a mass to heat up
-            if self.nodeTree.topLevelItemCount() == 1:
-                node = self.backendNodes[0]
-                a = node.T + node.Eg/(node.density*node.V*node.c)*teval
-                time = teval/timeScaleFactor
-                self.canvas.ax.plot(time, unit_convert(a, "K", self.temperatureUnits.currentText()))
-                legend.append("Node 1")
+            if self.nodeTree.topLevelItemCount() == 1:           
+                if node.isothermal == 'False':
+                    node = self.backendNodes[0]
+                    a = node.T + node.Eg/(node.density*node.V*node.c)*teval
+                    self.canvas.ax.plot(time, unit_convert(a, "K", self.temperatureUnits.currentText()))
+                    legend.append("Node 1")
+                    self.canvas.draw()
+                else: 
+                    self.outputText.setVisible(True)
+                    self.outputText.setText("There are easier ways to plot a flat line.")
+                    self.canvas.ax.plot(time, [unit_convert((node.T), 'K', self.temperatureUnits.currentText())]*np.size(time))
+                    self.canvas.ax.set_xlabel("Time, " + timeUnit)
+                    self.canvas.ax.set_ylabel("Temperature, " + temperatureUnits)
+                    self.canvas.ax.set_title("Node Temperature vs Time")
+                    self.canvas.ax.grid(True)
+                    self.canvas.draw()
             else: 
-                
+                self.outputText.setVisible(True)
+                self.outputText.setText("It's the T_solve function??")
                 a = t.T_vs_t(tspan, teval, self.backendPaths, self.backendNodes)
                 time = a.t/timeScaleFactor
                 y =a.y 
@@ -657,13 +774,13 @@ class thermalSolver(QWidget):
                 for i in range(len(y[:,0])):
                     self.canvas.ax.plot(time, y[i,:])
                     legend.append(f"Node {self.backendNodes[i].identifier}")
-            self.canvas.ax.set_xlabel("Time, " + timeUnit)
-            self.canvas.ax.set_ylabel("Temperature, " + temperatureUnits)
-            self.canvas.ax.set_title("Node Temperature vs Time")
-            self.canvas.ax.grid(True)
-            self.canvas.ax.legend(legend)
-            self.canvas.draw()
-            self.outputText.setVisible(False)
+                self.canvas.ax.set_xlabel("Time, " + timeUnit)
+                self.canvas.ax.set_ylabel("Temperature, " + temperatureUnits)
+                self.canvas.ax.set_title("Node Temperature vs Time")
+                self.canvas.ax.grid(True)
+                self.canvas.ax.legend(legend)
+                self.canvas.draw()
+                self.outputText.setVisible(False)
         except Exception as ex:
             print(ex)
             self.outputText.setVisible(True)
@@ -718,38 +835,78 @@ class thermalSolver(QWidget):
         except Exception as e:
             self.outputText.setText(str(e))
 
-    #region node entries
+    #region update node entries
     def updateNodeEntries(self,item):
         try:
             itemClicked = item.text(0)
             nodeNumber = itemClicked.split(' ')[-1]
-            self.currentNodeSelection.setValue(int(nodeNumber))
+            self.currentNodeSelection.setValue(int(nodeNumber)) #Sets node selection to the correct node
             for i in range(self.nodeTree.topLevelItemCount()):
                 if self.backendNodes[i].identifier == int(nodeNumber):
                     node = self.backendNodes[i]
-
+            
             self.isothermalInput.setCurrentText(str(node.isothermal))
-            self.temperatureInput.setText(str(unit_convert(node.T, "K", item.child(0).text(2))))
+            self.temperatureInput.setText(str(round(unit_convert(node.T, "K", item.child(0).text(2)),2)))
             self.temperatureUnits.setCurrentText(item.child(0).text(2))
-            self.mediumSelection.setCurrentText(node.medium)
             self.mediumTypeSelection.setCurrentText(node.medium_type)
-            self.volumeInput.setText(str(unit_convert(node.V, "m^3", item.child(2).text(2))))
-            self.volumeUnits.setCurrentText(item.child(2).text(2))
-            self.pressureInput.setText(str(unit_convert(node.Pressure, 'Pa', item.child(4).text(2)))) if node.medium_type == 'FLUID' else ''
-            self.pressureUnits.setCurrentText(item.child(4).text(2))
-            self.heatGeneratedInput.setText(str(unit_convert(node.Eg, 'W', item.child(3).text(2)))) if node.isothermal == False else ''
-            self.energyUnits.setCurrentText(item.child(3).text(2))
+            self.mediumSelection.setCurrentText(node.medium)
             self.emissivityInput.setText(str(node.e))
             self.absorbivityInput.setText(str(node.a))
             self.outputText.setText(f"{itemClicked} selected")
-        except:
-            self.outputText.setText("if attribute needs to be changed, click on parent node not on attributes.")    
-   
+
+            if node.isothermal == False:
+
+                if node.medium_type == 'SOLID' and node.medium != 'CUSTOM': 
+                    
+                    self.volumeInput.setText(str(unit_convert(node.V, "m^3", item.child(5).text(2))))
+                    self.volumeUnits.setCurrentText(item.child(5).text(2))
+                    self.heatGeneratedInput.setText(str(unit_convert(node.Eg, 'W', item.child(6).text(2)))) 
+                    self.energyUnits.setCurrentText(item.child(6).text(2))
+                elif node.medium_type == 'SOLID' and node.medium == 'CUSTOM':
+                    self.DensityInput.setText(str(unit_convert(node.density, 'kg/m^3', item.child(5).text(2))))
+                    self.densityUnits.setCurrentText(item.child(5).text(2))
+                    self.ConductivityInput.setText(str(node.k))
+                    self.SpecificHeatCapacityInput.setText(str(node.c))
+                    self.volumeInput.setText(str(unit_convert(node.V, "m^3", item.child(8).text(2))))
+                    self.volumeUnits.setCurrentText(item.child(8).text(2))
+                    self.heatGeneratedInput.setText(str(unit_convert(node.Eg, 'W', item.child(9).text(2)))) 
+                    self.energyUnits.setCurrentText(item.child(9).text(2))
+                
+                elif node.medium_type == 'FLUID':   
+                    self.volumeInput.setText(str(unit_convert(node.V, "m^3", item.child(2).text(2))))
+                    self.volumeUnits.setCurrentText(item.child(2).text(2))
+                    self.heatGeneratedInput.setText(str(unit_convert(node.Eg, 'W', item.child(3).text(2)))) 
+                    self.energyUnits.setCurrentText(item.child(3).text(2))
+                    self.pressureInput.setText(str(unit_convert(node.Pressure, 'Pa', item.child(4).text(2)))) 
+                    self.pressureUnits.setCurrentText(item.child(4).text(2))
+                    self.mediumSelection.setCurrentText(item.child(1).text(1))
+
+            elif node.isothermal == True:
+                if node.medium_type == 'FLUID':
+                    self.pressureInput.setText(str(unit_convert(node.Pressure, 'Pa', item.child(2).text(2)))) 
+                    self.pressureUnits.setCurrentText(item.child(2).text(2))
+                    self.mediumSelection.setCurrentText(item.child(1).text(1))
+                elif node.medium_type == 'SOLID' and node.medium != 'CUSTOM':
+                    self.mediumSelection.setCurrentText(item.child(1).text(1))
+                elif node.medium == 'CUSTOM':
+                    self.DensityInput.setText(str(unit_convert(node.density, 'kg/m^3', item.child(5).text(2))))
+                    self.densityUnits.setCurrentText(item.child(5).text(2))
+                    self.ConductivityInput.setText(str(node.k))
+                    self.SpecificHeatCapacityInput.setText(str(node.c))
+
+
+            
+            
+           
+        except Exception as e:
+            print(e)
+            self.outputText.setText("If attribute needs to be changed, click on parent node, not on attributes.")    
+    #region UPDATE PATH ENTRIES
     def updatePathEntries(self, item): 
         try:
             itemClicked = item.text(0)
             pathNumber = itemClicked.split(' ')[-1]
-            self.currentPathSelection.setValue(int(pathNumber))
+            self.currentPathSelection.setValue(int(pathNumber)) #sets path selection to the correct path
             for i in range(self.pathTree.topLevelItemCount()):
                 if self.backendPaths[i].identifier == int(pathNumber):
                     path = self.backendPaths[i]
@@ -757,11 +914,13 @@ class thermalSolver(QWidget):
             self.heatTransferAreaInput.setText(str(unit_convert(path.Area, 'm^2', item.child(2).text(2))))
             self.areaUnits.setCurrentText(item.child(2).text(2))
             self.heatTransferCoefficientInput.setText(str(path.h))
+            self.distanceUnits.setCurrentText(item.child(3).text(2))
             self.dxInput.setText(str(unit_convert(path.dx,'m', item.child(3).text(2)))) if self.heatTransferModeInput.currentText() == 'CONDUCTION' else ''
             self.connectedNodesSelection1.setCurrentText(str(item.child(0).text(1)))
             self.connectedNodesSelection2.setCurrentText(str(item.child(1).text(1)))
-        except:
-            self.outputText.setText("if attribute needs to be changed, click on parent path not on attributes.")
+        except Exception as e:
+            print(e)
+            self.outputText.setText("If attribute needs to be changed, click on parent path, not on attributes.")
 
     def clearAll(self):
         for widget in self.findChildren(QLineEdit):
@@ -812,6 +971,10 @@ class thermalSolver(QWidget):
         self.timeFinalLabel.setText(
             "TIME DURATION, " + f'{self.timeUnits.currentText()}'
         )
+    def updateDensityUnits(self):
+        self.DensityLabel.setText(
+            "NODE DENSITY, " + f'{self.densityUnits.currentText()}'
+        )
     def toggleHeatTransferProperties(self):
         if self.heatTransferModeInput.currentText() == "CONDUCTION": 
             self.heatTransferCoefficientLabel.setVisible(False)
@@ -823,6 +986,23 @@ class thermalSolver(QWidget):
             self.heatTransferCoefficientInput.setVisible(True)
             self.dxLabel.setVisible(False)
             self.dxInput.setVisible(False)
+            
+    def customMaterialEntry(self): 
+        if self.mediumSelection.currentText() == 'CUSTOM':
+            self.ConductivityLabel.setVisible(True)
+            self.ConductivityInput.setVisible(True)
+            self.DensityLabel.setVisible(True)
+            self.DensityInput.setVisible(True)
+            self.SpecificHeatCapacityLabel.setVisible(True)
+            self.SpecificHeatCapacityInput.setVisible(True)
+        else:
+            self.ConductivityLabel.setVisible(False)
+            self.ConductivityInput.setVisible(False)
+            self.DensityLabel.setVisible(False)
+            self.DensityInput.setVisible(False)
+            self.SpecificHeatCapacityLabel.setVisible(False)
+            self.SpecificHeatCapacityInput.setVisible(False) 
+
     #endregion UPDATE METHODS
 
 def main():
@@ -833,4 +1013,3 @@ def main():
 
 if __name__ == '__main__': 
     main()
-
