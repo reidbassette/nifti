@@ -508,7 +508,7 @@ class DistanceConverter(QWidget):
             )
         except:
             self.output.setText("Didn't work")
-
+#region FlowCapacityConverter
 class FlowCapacityConverter(QWidget):
 
     def __init__(self, parent):
@@ -597,7 +597,7 @@ class FlowCapacityConverter(QWidget):
         except:
             self.output.setText("Didn't work")
         """
-
+#region CvtoCdA
 class Cv_to_CdAConverter(QWidget):
 
     def __init__(self, parent):
@@ -637,6 +637,7 @@ class Cv_to_CdAConverter(QWidget):
         layout.addWidget(self.output)
 
         self.output_unit = QLabel()
+        self.output_unit.setText("CdA")#new 12/13/24
         layout.addWidget(self.output_unit)
         
         self.update_button = QPushButton("Update")
@@ -700,7 +701,7 @@ class Cv_to_CdAConverter(QWidget):
             self.output_unit.setFont(menufont)
         except:
             self.output.setText("Didn't work")
-
+#region CvtoDo
 class Cv_to_DoConverter(QWidget):
 
     def __init__(self, parent):
@@ -749,6 +750,7 @@ class Cv_to_DoConverter(QWidget):
         layout.addWidget(self.output)
 
         self.output_unit = QLabel()
+        self.output_unit.setText("Cd, Do")#new 12/13/24
         layout.addWidget(self.output_unit)
         
         self.update_button = QPushButton("Update")
@@ -872,7 +874,9 @@ class CdA_to_DoConverter(QWidget):
         layout.addWidget(self.output)
 
         self.output_unit = QLabel()
+        self.output_unit.setText("Cd, Do")#new
         layout.addWidget(self.output_unit)
+
         
         self.update_button = QPushButton("Update")
         self.update_button.clicked.connect(self.update_button_clicked)
@@ -902,7 +906,7 @@ class CdA_to_DoConverter(QWidget):
                                     "in"
                                 ),
                                 self.input_unit.currentText(),
-                                self.output_unit.text(),
+                                self.output_unit.text(), #bug?
                                 Cd= float(self.discharge_coefficient.text())
                             ),
                             "in^2",
