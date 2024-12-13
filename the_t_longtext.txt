@@ -8,7 +8,7 @@ thermal_solver.py:
 material mapping maps materials to proper syntax for mat_lib.py. 
 
 class Node: 
-	requires temperature and medium type in order to create a node instance, everything else defaults to zero. For fluid instances, specific heat capacity, density, and conductivity are pulled from the devices. materials of type CUSTOM must have these quantities specified by the user. 
+	requires temperature and medium type in order to create a node instance, everything else defaults to zero. For fluid instances, specific heat capacity, density, and conductivity are pulled pulled from the getfluidproperty(). materials of type CUSTOM must have these quantities specified by the user. 
 
 class Path: 
 	requires 2 nodes to create an instance, all other values default to a 0 or 1. The identifier attribute is used in t_solve.updatePathEntries() to identify the correct path to perform the update method.
