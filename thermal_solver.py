@@ -199,7 +199,7 @@ def T_vs_t(t, t_eval, path, nodes):
                         Eg_A = path[P[j]].nodeA.Eg
                         Eg_B = path[P[j]].nodeB.Eg
                         
-                        #get temperature associated with path[p[j]] order must be maintained. 
+                        #get temperature associated with path[p[j]]. order must be maintained. 
                         T1 = T[nodes.index(path[P[j]].nodeA)]
                         T2 = T[nodes.index(path[P[j]].nodeB)]
                         

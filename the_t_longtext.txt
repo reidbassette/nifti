@@ -1,0 +1,93 @@
+LONG TEXT FOR thermal_solver.py and t_solve.py
+
+PURPOSE: 
+this text will walk through the thermal_solver.py script providing a high-level description of the classes and T_vs_t function. It will also walk through the t_solve.py script. 
+
+thermal_solver.py:
+
+material mapping maps materials to proper syntax for mat_lib.py. 
+
+class Node: 
+	requires temperature and medium type in order to create a node instance, everything else defaults to zero. For fluid instances, specific heat capacity, density, and conductivity are pulled from the devices. materials of type CUSTOM must have these quantities specified by the user. 
+
+class Path: 
+	requires 2 nodes to create an instance, all other values default to a 0 or 1. The identifier attribute is used in t_solve.updatePathEntries() to identify the correct path to perform the update method.
+
+def T_vs_t(t, t_eval, paths, nodes): 
+
+	accepts timespan::type::list, time of evaluation::type::array, a list of paths, and a list of nodes. first creates a list of Temperatures. Then if more than 3 nodes are present in node list, iterate through each path checking: if either of the nodes are equal to the ith node, then append the jth path to ith nodes connectedPaths list.
+
+
+solve_ivp() and func(t, T):
+
+	The first thing that the solve_ivp checks for is if it is a 2 node system; if it is, it does not jump into a for-loop. If it isn't, it gets the connected paths to the ith node and then iterates through the two nodes connected to the jth path. The highest level if statements check if the iteration node matches the node being accessed by the "i" for-loop, then swap signs if it isn't. runs through time interval
+
+t_solve.py:
+
+
+class thermalSolver: 
+
+def __init__(self,parent): 
+	declares all the widgets for the application. 
+
+def setNodeSelection(self):
+	First clears all selected nodes. Then sets the first selection to the first node in the node list for convenience.
+
+def changeNodeSelectionItems(self):
+	selects the selections for the second node box. First clears the current selection and then checks if the current iteration is either already selected by the first node box or if no selection has been made for the first box. If true, then pass. Otherwise, add item to node box 2.
+
+def updateNode(self):
+
+	the number 15 is arbitrary. can be increased without having to modify any other code. 
+
+	First clears the nodeTree, then modifies the attribute list based on if the node is an isothermal solid or fluid. For custom materials, an in-line conditional is added to include their material properties. 
+
+	Identifier attribute of node object is used to first add all other nodes that are not being modified to backendNodes list. 
+
+	Builds new node object and appends to backend node. 
+	
+	Node dictionary is used to create node tree.
+	
+	After the node has been generated, the method then checks to see if the generated node has been connected to any pre-determined paths. If it has, then it replaces the previous node data with the current. This action checks both nodes in a path.	
+
+def updatePath(self):
+
+	First checks to see if path already exists and is not updating pre-existing paths. It does this by comparing the unreduced fraction made by the currently selected nodes to the unreduced fraction made by each pre-existing path. If the fraction or it's inverse matches. then it does not add this path. Else continue.
+
+	Appends new path to backendPath list. 
+
+def solve(self): 
+	First clears each node.connectedPaths list for new calculations. Also clears the plot. If either backendPaths or backendNodes are empty and there is more than one node stored in the solver, then spit out an error. Same goes for the lack of nodes. Single node case just plots temperature vs time as a constant heat rate is applied. 
+If more than one node exists, the call the T_vs_t() function. After plotting, it converts the results from SI to the initial units inputted by the user.
+
+ 
+def removeNode(self):
+	Removes node from node tree and in backendNodes list using double for-loop. Also reduces currentNodeSelection (spinbox) # and reduces the currentNodeSelection max value (i.e if node 10 was removed, the current node now becomes node 9 and node 11 can no longer be an option). 
+
+def removePath(self): 
+	Does the same thing as the removeNode function except for paths.
+
+def updateNodeEntries(self): 
+	Set current node selection to the item clicked on by the user. grab all the backend data (temperature, absorptivity etc) from the node object and convert to strings. Isothermal conditions and medium type influences node data so the function sets different text based on these conditions.
+
+def updatePathEntries(self,item):
+	for loop searches for path that is the same as the pathnumber and then uses that backendpath to update the current text.
+	
+	
+
+
+
+	
+	
+	
+
+	
+
+	
+	
+
+	 
+	
+	
+	
+	

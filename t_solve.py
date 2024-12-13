@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
-from fractions import Fraction
 
 class MplCanvas(FigureCanvas):
     
@@ -418,7 +417,7 @@ class thermalSolver(QWidget):
         self.connectedNodesSelection1.clear()
 
         top_level_count = self.nodeTree.topLevelItemCount()
-        #if topLevelItemCount
+       
         self.connectedNodesSelection1.addItem(self.nodeTree.topLevelItem(0).text(0)) if self.nodeTree.topLevelItemCount() != 0 else ''
         
         for i in range(top_level_count): 
@@ -435,7 +434,7 @@ class thermalSolver(QWidget):
         try:
             if self.nodeTree.topLevelItemCount() == 15:
                 self.outputText.setVisible(True)
-                self.outputText.setText("Maximum number of nodes exceeded(10)")
+                self.outputText.setText("Maximum number of nodes exceeded (15)")
                 return 1
             items = []
             self.nodeTree.clear()
@@ -455,14 +454,13 @@ class thermalSolver(QWidget):
                 attributes = [
                     "T," + (self.temperatureInput.text()) +':'+self.temperatureUnits.currentText(), 
                     "MEDIUM,"+self.mediumSelection.currentText()+':', 
-                 
                     "EMISSIVITY," + (self.emissivityInput.text()) +':',
                     "ABSORPTIVITY,"+(self.absorbivityInput.text()) +':',
                     "ISOTHERMAL," + (self.isothermalInput.currentText()) + ':',
                     "DENSITY," + (self.DensityInput.text()) + ':' + self.densityUnits.currentText() if self.mediumSelection.currentText() == 'CUSTOM' else '',
                     "THERMAL CONDUCTIVTIY," + (self.ConductivityInput.text()) + ':' + 'W/m-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
                     "SPECIFIC HEAT CAPACITY," + (self.SpecificHeatCapacityInput.text()) + ':' + 'J/kg-K' if self.mediumSelection.currentText() == 'CUSTOM' else '',
-                    "VOLUME," + (self.volumeInput.text()) +':'+ self.volumeUnits.currentText(), #change 
+                    "VOLUME," + (self.volumeInput.text()) +':'+ self.volumeUnits.currentText(), 
                     "HEAT GENERATED," + (self.heatGeneratedInput.text()) + ':'+self.energyUnits.currentText(), 
                 ]
             elif self.mediumTypeSelection.currentText() == 'FLUID' and self.isothermalInput.currentText() == 'False': 
@@ -553,7 +551,7 @@ class thermalSolver(QWidget):
         
             '''if node exists in an already determined path (i.e in path tree), then update path(s) with current node'''
             for node in self.backendNodes:
-                if node.identifier == int(self.currentNodeSelection.text()):
+                if node.identifier == int(self.currentNodeSelection.text()): #grabs the node being updated
                     updatedNode = node
             for i in range(len(self.backendPaths)):
                 node1 = self.backendPaths[i].nodeA
@@ -651,7 +649,7 @@ class thermalSolver(QWidget):
             print(self.paths)
             print(self.backendPaths)
 
-        except Exception as e: 
+        except Exception: 
             self.outputText.setText("Something went wrong with path inputs.")   
 
     #Sets Selection Medium based on medium type selection
@@ -764,7 +762,6 @@ class thermalSolver(QWidget):
                     self.canvas.draw()
             else: 
                 self.outputText.setVisible(True)
-                self.outputText.setText("It's the T_solve function??")
                 a = t.T_vs_t(tspan, teval, self.backendPaths, self.backendNodes)
                 time = a.t/timeScaleFactor
                 y =a.y 
@@ -893,14 +890,11 @@ class thermalSolver(QWidget):
                     self.densityUnits.setCurrentText(item.child(5).text(2))
                     self.ConductivityInput.setText(str(node.k))
                     self.SpecificHeatCapacityInput.setText(str(node.c))
-
-
-            
-            
            
         except Exception as e:
             print(e)
             self.outputText.setText("If attribute needs to be changed, click on parent node, not on attributes.")    
+            
     #region UPDATE PATH ENTRIES
     def updatePathEntries(self, item): 
         try:

@@ -3,6 +3,7 @@
 # nuitka-project: --standalone
 # nuitka-project: --onefile
 # nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/nifti-splash-screen.png
+
 # nuitka-project: --windows-console-mode=disable
 # nuitka-project: --include-module=matplotlib
 # nuitka-project: --include-module=scipy
@@ -13,6 +14,7 @@
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/charging_diagram.png=charging_diagram.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/nifti-icon.png=nifti-icon.png
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/orifice_diagram.png=orifice_diagram.png
+# nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/nifti-icon.ico
 # nuitka-project: --enable-plugin=pyqt6
 
 
