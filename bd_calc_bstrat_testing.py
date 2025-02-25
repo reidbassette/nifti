@@ -26,6 +26,7 @@ from PIL import Image
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.image import imread
+from plot import Plot
 
 basedir = os.path.dirname(__file__)
 
@@ -48,12 +49,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.title)
         #self.setGeometry(self.left, self.top, self.width, self.height)
         
-        self.table_widget = BlowdownCalculator(self)
+        self.table_widget = BlowdownCalculator1(self)
         self.setCentralWidget(self.table_widget)
         
         self.show()
 
-class BlowdownCalculator(QWidget):
+class BlowdownCalculator1(QWidget):
 
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
@@ -254,21 +255,26 @@ class BlowdownCalculator(QWidget):
             self.canvas2.axes.grid(True, which='minor')
         self.canvas2.draw()
 
-    def update_pressure_plot(self, time_series, pressure_series, time_units):
-        """
-        update plot
-        """
-        self.canvas.axes.cla()
-        self.canvas.axes.plot(time_series, pressure_series)
-        self.canvas.axes.set_ylabel("Pressure, " + self.pressure_units.currentText())
-        self.canvas.axes.set_xlabel("Time, " + str(time_units))
-        self.canvas.axes.set_title("Vessel Pressure vs. Time")
-        self.canvas.axes.grid(True)
-        if self.minor_grid_checkbox.isChecked():
-            self.canvas.axes.minorticks_on()
-            self.canvas.axes.grid(True, which='minor')
-        self.canvas.draw()
+#region update_pressure_plot
 
+    # def update_pressure_plot(self, time_series, pressure_series, time_units):
+    #     """
+    #     update plot
+    #     """
+    #     self.canvas.axes.cla()
+    #     self.canvas.axes.plot(time_series, pressure_series)
+    #     self.canvas.axes.set_ylabel("Pressure, " + self.pressure_units.currentText())
+    #     self.canvas.axes.set_xlabel("Time, " + str(time_units))
+    #     self.canvas.axes.set_title("Vessel Pressure vs. Time")
+    #     self.canvas.axes.grid(True)
+    #     if self.minor_grid_checkbox.isChecked():
+    #         self.canvas.axes.minorticks_on()
+    #         self.canvas.axes.grid(True, which='minor')
+    #     self.canvas.draw()
+
+#endregion
+
+#region button clicked
     def update_button_clicked(self):
         """ 
         solve the initial value problem
@@ -399,8 +405,39 @@ class BlowdownCalculator(QWidget):
             else:
                 t = soln.t
                 time_units = "s"
+#region call plot            
             # update the pressure vs time plot
-            self.update_pressure_plot(t, P, time_units)
+
+            x_value = "time" # this will need to be a user selection
+            y_value = "pressure"  # this will need to be a user selection
+
+            if x_value == "time":
+                x_unit = time_units
+                x_data = t
+                # add all other x axis options
+            else:
+                self.mass_flow_rate.setText(
+                "Invalid x value"
+            )
+
+            if y_value == "pressure":
+                y_unit = pressure_units
+                y_data = P
+            if y_value == "mass flow rate":
+                y_unit = mass_flow_units
+                y_data = mdot
+                # add all other y axis options
+            else:
+                self.mass_flow_rate.setText(
+                "Invalid y value"
+            )
+                
+            self.call_plot = Plot(x_data, y_data, x_unit, y_unit)
+
+            
+
+
+
             self.update_flow_plot(t, mdot, time_units)
             # update the peak mass flow rate text
             self.mass_flow_rate.setText(
@@ -437,6 +474,11 @@ class BlowdownCalculator(QWidget):
             self.mass_flow_rate.setText(
                 "Invalid inputs or other error"
             )
+#endregion
+#endregion
+
+#region report button
+
 
     def report_button_clicked(self):
         filedialog = QFileDialog()
@@ -601,7 +643,7 @@ class BlowdownCalculator(QWidget):
                     "Could not generate report"
                 )
 
-
+#endregion
     
 
 
@@ -687,7 +729,6 @@ def solve_problem(func, t_span, event, volume, P0, T0, Pb, CdA, fluid):
         max_step = t_span[1] / len(times)
     )
 
-#plotting functions
 def generate_report1(
     time_array, 
     pressure_array, 
@@ -725,7 +766,7 @@ def generate_report1(
         for j in range(num_cols):
             axs[i, j].set_facecolor('white')
             axs[i, j].axis('off')
-    Header = "can brendan edit anything"       #"Vessel Blowdown Calculation"
+    Header = "Vessel Blowdown Calculation"
     Contact = "Analyst: " + str(analyst_name) +"\nDate: " + str(date)
     fluid = "Fluid: " + str(fluid_name)
     vessel_volume = "Vessel Volume: " + str(volume) + " " + str(volume_units)
@@ -750,9 +791,7 @@ def generate_report1(
 
 # actual plotting in tile [3,1]
 
-    axs[3, 1].plot(time_array, time_array)                  # before messing this line was  axs[3, 1].plot(time_array, pressure_array)
-    print(time_array)
-    print(pressure_array)
+    axs[3, 1].plot(time_array, pressure_array)
     axs[3, 1].axis('on')
     axs[3, 1].ticklabel_format(useOffset=False)
     axs[3, 1].grid()
