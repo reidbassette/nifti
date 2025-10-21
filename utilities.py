@@ -896,3 +896,20 @@ def Grashof(fluid,
 
 def Rayleigh(Grashof, Prandtl):
     return Grashof * Prandtl
+
+
+def LMTD(Thi, Tho, Tci, Tco, counterflow=True):
+    if counterflow:
+        dTF1 = Thi-Tco
+        dTF2 = Tho-Tci
+    else:
+        dTF1 = Thi-Tci
+        dTF2 = Tho-Tco
+
+    ratio = dTF2/dTF1
+    if not counterflow and (ratio <= 0.0 or ratio == 1.0):
+        return 0.0
+    elif counterflow and (ratio <= 0.0 or ratio == 1.0):
+        return dTF1
+    else:
+        return (dTF2 - dTF1)/m.log(dTF2/dTF1)

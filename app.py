@@ -34,6 +34,7 @@ from charging_calc import ChargingCalculator
 from conversions import Conversions
 from orifice_calc import OrificeTableWidget
 from t_solve import thermalSolver
+from hx_interface import HxSolver
 
 # Signal splash screen removal
 
@@ -80,12 +81,14 @@ class MyTableWidget(QWidget):
         self.tab3 = ChargingCalculator(self)
         self.tab4 = Conversions(self)
         self.tab5 = thermalSolver(self)
+        self.tab6 = HxSolver(self)
 
         self.tabs.addTab(self.tab1, "Orifice Calculator")
         self.tabs.addTab(self.tab2, "Blowdown Calculator")
         self.tabs.addTab(self.tab3, "Charging Calculator")
         self.tabs.addTab(self.tab4, "Unit Conversions")
         self.tabs.addTab(self.tab5, "Thermal Calculator")
+        self.tabs.addTab(self.tab6, "HX Calculator")
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
