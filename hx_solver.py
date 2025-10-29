@@ -5,10 +5,6 @@ from thermal_solver import material_mapping
 
 class HeatExchanger():
     """A Heat Exchanger"""
-
-    STP_P = 101325
-    STP_T = 273.15
-    BTU_HR = 3.412141633 #times watts
     HR_SECS = 3600
     PI = 3.14159265
 
@@ -834,3 +830,86 @@ class HeatExchanger():
         self.known_attributes = known_attributes
         self.unknown_attributes = unknown_attributes
         return self.known_attributes, self.unknown_attributes
+    
+    
+    # ───────────────── v in vars(self).items() if v is not None]
+
+    def _dependency_options_for(self, attribute):
+        """
+        Return the list of dependency options (each a list of attribute names)
+        for a given attribute, skipping the first entry which holds units.
+        """
+        try:
+            entries = self._dependencies[attribute]
+        except KeyError:
+            return []
+        # first sublist is units; subsequent sublists are options
+        return [opt for opt in entries[1:] if isinstance(opt, list)]
+
+    def dependency_status(self, attribute, known_attributes=None):
+        """
+        For a target attribute, return a list of dicts:
+        [{ 'option': [...], 'met': bool, 'missing': [...] }, ...]
+        """
+        known = set(self.known_attributes() if known_attributes is None else known_attributes)
+        status = []
+        for opt in self._dependency_options_for(attribute):
+            missing = [dep for dep in opt if dep not in known]
+            status.append({
+                "option": opt,
+                "met": len(missing) == 0,
+                "missing": missing
+            })
+        return status
+
+    def _humanize_attr(self, attr, mapping=None):
+        """Prettify an internal name, or map via UI label mapping if provided."""
+        if mapping and attr in mapping:
+            return str(mapping[attr])
+        s = attr[1:] if isinstance(attr, str) and attr.startswith('_') else str(attr)
+        return s.replace('_', ' ').title()
+
+    def dependency_tooltip(self, attribute, known_attributes=None, ui_friendly_names=None):
+        """
+        Build an HTML tooltip listing dependency options for `attribute`.
+        - Met options in black; unmet in red, with missing listed.
+        - `ui_friendly_names`: optional dict mapping internal names to UI labels.
+        """
+        if attribute not in self._dependencies:
+            return f"<b>No dependencies registered for <code>{attribute}</code></b>"
+
+        unit = ""
+        try:
+            unit = self._dependencies[attribute][0][0] or ""
+        except Exception:
+            pass
+
+        status_list = self.dependency_status(attribute, known_attributes=known_attributes)
+        title_name = self._humanize_attr(attribute, ui_friendly_names)
+        unit_str = f" &nbsp;<span style='color:#666'>(unit: {unit})</span>" if unit else ""
+
+        html = [f"<b>How to solve <code>{title_name}</code></b>{unit_str}"]
+        html.append("<ul style='margin-left:0.9em; padding-left:1.0em;'>")
+
+        if not status_list:
+            html.append("<li style='color:#cc0000;'>No dependency options listed</li>")
+        else:
+            for st in status_list:
+                color = "#000000" if st["met"] else "#cc0000"
+                deps = ", ".join(self._humanize_attr(x, ui_friendly_names) for x in st["option"])
+                if st["met"]:
+                    html.append(f"<li style='color:{color};'><code>{deps}</code></li>")
+                else:
+                    missing = ", ".join(self._humanize_attr(x, ui_friendly_names) for x in st["missing"])
+                    html.append(
+                        f"<li style='color:{color};'><code>{deps}</code> — missing: {missing}</li>"
+                    )
+
+        html.append("</ul>")
+        return "".join(html)
+    #────────────────────────────────────────────────────────────
+    # Dependency introspection & tooltip helpers (for UI hover tooltips)
+    # ─────────────────────────────────────────────────────────────────────────────
+    def known_attributes(self):
+        """Return attributes that are currently set (value is not None)."""
+        return [k for k, v in vars(self).items() if v is not None]

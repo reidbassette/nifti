@@ -184,6 +184,8 @@ class HxSolver(QWidget):
         self._prev_mdot_hot_units  = self.massFlowUnitsHot.currentText()
         self._prev_mdot_cold_units = self.massFlowUnitsCold.currentText()
 
+        self.attr_for_label = {}   # QLabel -> solver attribute name (e.g., "_Thi")
+
         def chip(label, widget):
             row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(6)
             t = QLabel(label); t.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -225,6 +227,8 @@ class HxSolver(QWidget):
 
         # ── Fields
         self.label_map = {}
+
+        '''
 
         # HOT
         self._Thi           = self._make_field_row(self.hotSideLayout, "TEMP HOT IN",            'line')
@@ -274,6 +278,43 @@ class HxSolver(QWidget):
         self._Plate_Distribution_Bias = self._make_field_row(self.dimensionsLayout, "ODD CH ASSIGN (Bias)",  'combo')
         self._Plate_Distribution_Bias.setItems(["hot","cold"])
         self._Hot_Passes              = self._make_field_row(self.dimensionsLayout, "HOT PASSES",            'line')
+
+        '''
+
+        # HOT
+        self._Thi          = self._make_field_row(self.hotSideLayout,  "TEMP HOT IN",          'line', solver_attr="_Thi")
+        self._Tho          = self._make_field_row(self.hotSideLayout,  "TEMP HOT OUT",         'line', solver_attr="_Tho")
+        self._Pres_H_in    = self._make_field_row(self.hotSideLayout,  "HOT INLET PRESSURE",   'line', solver_attr="_Pres_H_in")
+        self._H_inlet_ID   = self._make_field_row(self.hotSideLayout,  "HOT INLET I.D.",       'line', solver_attr="_H_inlet_ID")
+        self._H_outlet_ID  = self._make_field_row(self.hotSideLayout,  "HOT OUTLET I.D.",      'line', solver_attr="_H_outlet_ID")
+        self._mdot_h       = self._make_field_row(self.hotSideLayout,  "HOT MASS FLOW",        'line', solver_attr="_mdot_h")
+        self._H_in_nm3_hr  = self._make_field_row(self.hotSideLayout,  "HOT VOL FLOW (Nm^3/hr)",'line', solver_attr="_H_in_nm3_hr")
+        self._H_Fluid      = self._make_field_row(self.hotSideLayout,  "HOT FLUID",            'combo', solver_attr="_H_Fluid")
+
+        # COLD
+        self._Tci          = self._make_field_row(self.coldSideLayout, "TEMP COLD IN",         'line', solver_attr="_Tci")
+        self._Tco          = self._make_field_row(self.coldSideLayout, "TEMP COLD OUT",        'line', solver_attr="_Tco")
+        self._Pres_C_in    = self._make_field_row(self.coldSideLayout, "COLD INLET PRESSURE",  'line', solver_attr="_Pres_C_in")
+        self._C_inlet_ID   = self._make_field_row(self.coldSideLayout, "COLD INLET I.D.",      'line', solver_attr="_C_inlet_ID")
+        self._C_outlet_ID  = self._make_field_row(self.coldSideLayout, "COLD OUTLET I.D.",     'line', solver_attr="_C_outlet_ID")
+        self._mdot_c       = self._make_field_row(self.coldSideLayout, "COLD MASS FLOW",       'line', solver_attr="_mdot_c")
+        self._C_in_nm3_hr  = self._make_field_row(self.coldSideLayout, "COLD VOL FLOW (Nm^3/hr)",'line', solver_attr="_C_in_nm3_hr")
+        self._C_Fluid      = self._make_field_row(self.coldSideLayout, "COLD FLUID",           'combo', solver_attr="_C_Fluid")
+
+        # CORE
+        self._q            = self._make_field_row(self.coreLayout,     "HEAT TRANSFER RATE q", 'line', solver_attr="_q")
+        self._q_max        = self._make_field_row(self.coreLayout,     "THEORETICAL MAX q",    'line', solver_attr="_q_max")
+        self._UA           = self._make_field_row(self.coreLayout,     "OVERALL UA",           'line', solver_attr="_UA")
+        self._NTU          = self._make_field_row(self.coreLayout,     "NTU",                  'line', solver_attr="_NTU")
+        self._F_sub_T      = self._make_field_row(self.coreLayout,     "LMTD CORR FACTOR F",  'line', solver_attr="_F_sub_T")
+        self._epsilon      = self._make_field_row(self.coreLayout,     "EFFECTIVENESS ε",     'line', solver_attr="_effectiveness_epsilon")
+
+        # GEOMETRY
+        self._Plate_count             = self._make_field_row(self.dimensionsLayout, "PLATE COUNT",         'line', solver_attr="_Plate_count")
+        self._Plate_Distribution_Bias = self._make_field_row(self.dimensionsLayout, "ODD CH ASSIGN (Bias)",'combo', solver_attr="_Plate_Distribution_Bias")
+        self._Hot_Passes              = self._make_field_row(self.dimensionsLayout, "HOT PASSES",          'line', solver_attr="_Hot_Passes")
+
+
 
         # Derived outputs list (labels only—NO header here; added when placed in middle)
         self.out_labels = {}
@@ -377,6 +418,48 @@ class HxSolver(QWidget):
         self._refresh_all_labels()
 
     # ────────────────────────── UI builders ──────────────────────────
+
+    def _current_known_attributes(self, include_unlocked=True) -> set[str]:
+        """
+        Build a set of solver attribute names considered 'known' from current UI.
+        If include_unlocked is True, any non-empty field counts as known (even if not locked).
+        """
+        known = set()
+        # Include all LockFields that have text
+        for lab, attr in self.attr_for_label.items():
+            fld = getattr(self, attr, None)
+            if not isinstance(fld, LockField):
+                continue
+            txt = (fld.text() or "").strip()
+            if not txt:
+                continue
+            if include_unlocked or fld.is_locked():
+                known.add(attr)
+        return known
+
+    def _build_ui_name_map(self) -> dict:
+        """
+        Map internal attr names (e.g., '_Thi') to a readable label (without the ', unit' suffix).
+        """
+        name_map = {}
+        for lab, attr in self.attr_for_label.items():
+            base = lab.text().split(',')[0].strip()
+            name_map[attr] = base
+        return name_map
+
+    def _update_dependency_tooltips(self) -> None:
+        """
+        Compute HTML tooltips (via model helper) and attach to each QLabel.
+        """
+        tmp_model = hx.HeatExchanger()  # only for access to dependency_tooltip
+        known = self._current_known_attributes(include_unlocked=True)
+        ui_map = self._build_ui_name_map()
+        for lab, attr in self.attr_for_label.items():
+            html = tmp_model.dependency_tooltip(attr, known_attributes=known, ui_friendly_names=ui_map)
+            lab.setToolTip(html)
+
+
+
     def _section_header(self, text: str) -> QLabel:
         lab = QLabel(text)
         lab.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -387,7 +470,8 @@ class HxSolver(QWidget):
         line = QFrame(); line.setFrameShape(QFrame.Shape.HLine); line.setFrameShadow(QFrame.Shadow.Sunken)
         return line
 
-    def _make_field_row(self, layout: QVBoxLayout, label_text: str, kind='line', placeholder=""):
+    def _make_field_row(self, layout: QVBoxLayout, label_text: str,
+                        kind='line', placeholder="", solver_attr: str=None):
         row = QHBoxLayout()
         lab = QLabel(label_text)
         fld = LockField(kind=kind)
@@ -396,6 +480,8 @@ class HxSolver(QWidget):
         row.addWidget(fld, 3)
         layout.addLayout(row)
         self.label_map[lbl_key(label_text)] = lab
+        if solver_attr:
+            self.attr_for_label[lab] = solver_attr   # <-- NEW
         return fld
 
     def _all_lock_fields(self):
@@ -414,6 +500,7 @@ class HxSolver(QWidget):
         pU = self.pressureUnits.currentText()
         dU = self.distanceUnits.currentText()
         eU = self.energyUnits.currentText()
+        self._update_dependency_tooltips()
 
         def set_lbl(key, unit):
             if key in self.label_map:
@@ -617,12 +704,16 @@ class HxSolver(QWidget):
             self.solveLog.appendPlainText(log_text)
 
             self._update_from_model(model, ui_known_attrs)
+            # ... after self._update_from_model(model, ui_known_attrs)
+            self._update_dependency_tooltips()
 
         except Exception as ex:
             QMessageBox.warning(self, "Solve error",
-                "Inputs are incomplete or inconsistent for solving.\n\n"
-                f"{ex}"
-            )
+                                "Inputs are incomplete or inconsistent for solving.\n\n"
+                                f"{ex}")
+            # Keep tooltips informative even after a failed solve
+            self._update_dependency_tooltips()
+
 
     # ────────────────────────── Read-back + Derived ──────────────────────────
     def _update_from_model(self, model: hx.HeatExchanger, ui_known_attrs: set):
