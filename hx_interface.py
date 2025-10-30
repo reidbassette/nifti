@@ -1,9 +1,10 @@
+# hx_interface.py
 import sys
 import io
 from contextlib import redirect_stdout
 import numpy as np
 
-# Utilities (unchanged contract)
+# Utilities (contract must match your utilities.py)
 from utilities import (
     unit_convert,
     pressure_units, temperature_units, distance_units, area_units,
@@ -31,7 +32,7 @@ class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=8, height=4.0, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi, layout="constrained")
         self.ax = fig.add_subplot(111)
-        self.ax.set_title("Graph placeholder")
+        self.ax.set_title("Temperature Profiles")
         self.ax.grid(True)
         super().__init__(fig)
 
@@ -62,15 +63,6 @@ def lbl_key(s: str) -> str:
 def _energy_key_for_util(ui_unit: str) -> str:
     # utilities.to_W/from_W map 'BTU', UI shows 'BTUphr'
     return "BTU" if ui_unit.upper().startswith("BTU") else "W"
-
-
-def _safe_unit_convert(val, from_u: str, to_u: str, fluid=None):
-    try:
-        if fluid is None:
-            return unit_convert(val, from_u, to_u)
-        return unit_convert(val, from_u, to_u, fluid)
-    except Exception:
-        return val
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -108,7 +100,7 @@ class LockField(QWidget):
         return self.lock_btn.isChecked()
 
     def set_locked(self, locked: bool):
-        self.lock_btn.setChecked(locked)  # will also call _on_lock_toggled via signal
+        self.lock_btn.setChecked(locked)
 
     def setText(self, txt: str):
         if isinstance(self.editor, QLineEdit):
@@ -141,7 +133,7 @@ class LockField(QWidget):
 
     def mark_solved(self, solved: bool):
         if isinstance(self.editor, QLineEdit):
-            # solved values green tint
+            # solved values → green tint
             self.editor.setStyleSheet("color: #2ca02c;" if solved else "")
 
 
@@ -161,9 +153,7 @@ class MainWindow(QMainWindow):
 # ────────────────────────────────────────────────────────────────────────────────
 class HxSolver(QWidget):
     """
-    Locked-only inputs → solve_hx → show solved (colored).
-    Physics profiles when (UA or NTU) + Ch, Cc, Thi, Tci are available.
-    Includes plate-only thermo-hydraulic geometry. Non-plate types hide those.
+    UI for PLATE / SHELL & TUBE / AIR-COOLED; locks and tooltips included.
     """
     def __init__(self, parent):
         super().__init__()
@@ -182,19 +172,22 @@ class HxSolver(QWidget):
         self.unitsBar.setSpacing(12)
 
         # Three columns below the units bar
-        self.left_col = QVBoxLayout()   # Hot + Cold + Core + Geometry + Buttons
-        self.mid_col = QVBoxLayout()    # Derived / Read-only
-        self.right_col = QVBoxLayout()  # Solve Log
+        self.left_col = QVBoxLayout()
+        self.mid_col = QVBoxLayout()
+        self.right_col = QVBoxLayout()
 
         # Sub-sections
         self.hotSideLayout = QVBoxLayout()
         self.coldSideLayout = QVBoxLayout()
         self.coreLayout = QVBoxLayout()
         self.dimensionsLayout = QVBoxLayout()
+        self.plateBox = QWidget();  self.plateBox.setLayout(QVBoxLayout())
+        self.stBox    = QWidget();  self.stBox.setLayout(QVBoxLayout())
+        self.acBox    = QWidget();  self.acBox.setLayout(QVBoxLayout())
         self.buttonsLayout = QHBoxLayout()
-        self.outputsLayout = QVBoxLayout()  # Derived list only (no header here)
+        self.outputsLayout = QVBoxLayout()
 
-        # Unit pickers (horizontal chips)
+        # Unit pickers
         self.pressureUnits = QComboBox();    self.pressureUnits.addItems(pressure_units)
         self.temperatureUnits = QComboBox(); self.temperatureUnits.addItems(temperature_units)
         self.volumeUnits = QComboBox();      self.volumeUnits.addItems(volume_units)
@@ -237,7 +230,6 @@ class HxSolver(QWidget):
         self.nameLabel = QLabel("HX NAME")
         self.nameInput = QLineEdit()
         self.hxTypeLabel = QLabel("HX TYPE")
-        # Prepare for future types; solver currently implements 'plate'
         self.hxTypeSelection = QComboBox(); self.hxTypeSelection.addItems(["PLATE", "SHELL & TUBE", "AIR-COOLED"])
         self.flowDirectionLabel = QLabel("FLOW DIRECTION")
         self.flowDirectionSelection = QComboBox(); self.flowDirectionSelection.addItems(["COUNTERCURRENT", "PARALLEL"])
@@ -247,9 +239,10 @@ class HxSolver(QWidget):
         self.titleLayout.addWidget(self.flowDirectionLabel); self.titleLayout.addWidget(self.flowDirectionSelection)
         self.titleLayout.addStretch(1)
 
-        # Fields
+        # Field registry
         self.label_map = {}
-        self.attr_for_label = {}  # QLabel -> solver attribute (for tooltips)
+        self.attr_for_label = {}
+        self.row_for_attr = {} 
 
         # HOT
         self._Thi         = self._make_field_row(self.hotSideLayout, "TEMP HOT IN", 'line', solver_attr="_Thi")
@@ -281,7 +274,7 @@ class HxSolver(QWidget):
         except Exception:
             self._C_Fluid.setItems(["AIR", "NITROGEN", "HYDROGEN", "HELIUM", "ARGON"])
 
-        # CORE (middle)
+        # CORE
         self._q        = self._make_field_row(self.coreLayout, "HEAT TRANSFER RATE q", 'line', solver_attr="_q")
         self._q_max    = self._make_field_row(self.coreLayout, "THEORETICAL MAX q", 'line', solver_attr="_q_max")
         self._UA       = self._make_field_row(self.coreLayout, "OVERALL UA", 'line', solver_attr="_UA")
@@ -289,69 +282,83 @@ class HxSolver(QWidget):
         self._F_sub_T  = self._make_field_row(self.coreLayout, "LMTD CORR FACTOR F", 'line', solver_attr="_F_sub_T")
         self._epsilon  = self._make_field_row(self.coreLayout, "EFFECTIVENESS ε", 'line', solver_attr="_effectiveness_epsilon")
 
-        # GEOMETRY / Plate (middle)
+        # GEOMETRY / Plate
         self.plateMaterialLabel = QLabel("PLATE MATERIAL")
         self.plateMaterialSelection = QComboBox(); self.plateMaterialSelection.addItems(["SS316"])
-        self.dimensionsLayout.addWidget(self.plateMaterialLabel)
-        self.dimensionsLayout.addWidget(self.plateMaterialSelection)
+        self.plateBox.layout().addWidget(self.plateMaterialLabel)
+        self.plateBox.layout().addWidget(self.plateMaterialSelection)
+        self._Plate_count             = self._make_field_row(self.plateBox.layout(), "PLATE COUNT", 'line', solver_attr="_Plate_count")
+        self._Plate_Distribution_Bias = self._make_field_row(self.plateBox.layout(), "ODD CH ASSIGN (Bias)", 'combo', solver_attr="_Plate_Distribution_Bias")
 
-        self._Plate_count             = self._make_field_row(self.dimensionsLayout, "PLATE COUNT", 'line', solver_attr="_Plate_count")
-        self._Plate_Distribution_Bias = self._make_field_row(self.dimensionsLayout, "ODD CH ASSIGN (Bias)", 'combo', solver_attr="_Plate_Distribution_Bias")
         self._Plate_Distribution_Bias.setItems(["hot", "cold"])
-        self._Hot_Passes              = self._make_field_row(self.dimensionsLayout, "HOT PASSES", 'line', solver_attr="_Hot_Passes")
+        self._Hot_Passes              = self._make_field_row(self.plateBox.layout(), "HOT PASSES", 'line', solver_attr="_Hot_Passes")
+        self._Lv   = self._make_field_row(self.plateBox.layout(), "VERT PORT DIST L_v", 'line', solver_attr="_Lv")
+        self._Lh   = self._make_field_row(self.plateBox.layout(), "HORIZ PORT DIST L_h", 'line', solver_attr="_Lh")
+        self._Dp   = self._make_field_row(self.plateBox.layout(), "PORT DIAMETER D_p", 'line', solver_attr="_Dp")
+        self._pitch= self._make_field_row(self.plateBox.layout(), "PLATE PITCH p", 'line', solver_attr="_pitch")
+        self._t_m  = self._make_field_row(self.plateBox.layout(), "PLATE THICKNESS t", 'line', solver_attr="_t_m")
+        self._b    = self._make_field_row(self.plateBox.layout(), "MEAN CHANNEL GAP b", 'line', solver_attr="_mean_channel_gap")
+        self._phi  = self._make_field_row(self.plateBox.layout(), "ENLARGEMENT φ", 'line', solver_attr="_enlargement_phi")
+        self._fouling_hot  = self._make_field_row(self.plateBox.layout(), "FOULING HOT", 'line', solver_attr="_fouling_hot")
+        self._fouling_cold = self._make_field_row(self.plateBox.layout(), "FOULING COLD", 'line', solver_attr="_fouling_cold")
+        # SHELL & TUBE
+        self.stHeader = self._section_header("Shell & Tube Geometry")
+        self.stBox.layout().addWidget(self.stHeader)
+        self._ST_hot_in_tube   = self._make_field_row(self.stBox.layout(), "HOT IN TUBE? (1/0)", 'line', solver_attr="_ST_hot_in_tube")
+        self._ST_N_tubes       = self._make_field_row(self.stBox.layout(), "TUBES (count)", 'line', solver_attr="_ST_N_tubes")
+        self._ST_N_tube_passes = self._make_field_row(self.stBox.layout(), "TUBE PASSES", 'line', solver_attr="_ST_N_tube_passes")
+        self._ST_N_shell_passes= self._make_field_row(self.stBox.layout(), "SHELL PASSES", 'line', solver_attr="_ST_N_shell_passes")
+        self._ST_Di            = self._make_field_row(self.stBox.layout(), "TUBE Di", 'line', solver_attr="_ST_Di")
+        self._ST_Do            = self._make_field_row(self.stBox.layout(), "TUBE Do", 'line', solver_attr="_ST_Do")
+        self._ST_L_pass        = self._make_field_row(self.stBox.layout(), "TUBE LENGTH/PASS", 'line', solver_attr="_ST_L_pass")
+        self._ST_k_wall        = self._make_field_row(self.stBox.layout(), "TUBE WALL k", 'line', solver_attr="_ST_k_wall")
+        self._ST_Rf_i          = self._make_field_row(self.stBox.layout(), "FOULING (inside)", 'line', solver_attr="_ST_Rf_i")
+        self._ST_Rf_o          = self._make_field_row(self.stBox.layout(), "FOULING (outside)", 'line', solver_attr="_ST_Rf_o")
+        self._ST_h_o           = self._make_field_row(self.stBox.layout(), "h_o (shell side, if known)", 'line', solver_attr="_ST_h_o")
 
-        # Paper-driven plate geometry & fouling
-        self._Lv   = self._make_field_row(self.dimensionsLayout, "VERT PORT DIST L_v", 'line', solver_attr="_Lv")
-        self._Lh   = self._make_field_row(self.dimensionsLayout, "HORIZ PORT DIST L_h", 'line', solver_attr="_Lh")
-        self._Dp   = self._make_field_row(self.dimensionsLayout, "PORT DIAMETER D_p", 'line', solver_attr="_Dp")
-        self._pitch= self._make_field_row(self.dimensionsLayout, "PLATE PITCH p", 'line', solver_attr="_pitch")
-        self._t_m  = self._make_field_row(self.dimensionsLayout, "PLATE THICKNESS t", 'line', solver_attr="_t_m")
-        self._b    = self._make_field_row(self.dimensionsLayout, "MEAN CHANNEL GAP b", 'line', solver_attr="_mean_channel_gap")
-        self._phi  = self._make_field_row(self.dimensionsLayout, "ENLARGEMENT φ", 'line', solver_attr="_enlargement_phi")
-        self._fouling_hot  = self._make_field_row(self.dimensionsLayout, "FOULING HOT", 'line', solver_attr="_fouling_hot")
-        self._fouling_cold = self._make_field_row(self.dimensionsLayout, "FOULING COLD", 'line', solver_attr="_fouling_cold")
+        # AIR-COOLED / Compact
+        self.acHeader = self._section_header("Air‑Cooled / Compact Core")
+        self.acBox.layout().addWidget(self.acHeader)
+        self._ACH_A_fr     = self._make_field_row(self.acBox.layout(), "FRONTAL AREA A_fr", 'line', solver_attr="_ACH_A_fr")
+        self._ACH_V        = self._make_field_row(self.acBox.layout(), "CORE VOLUME V", 'line', solver_attr="_ACH_V")
+        self._ACH_sigma    = self._make_field_row(self.acBox.layout(), "FREE-FLOW RATIO σ", 'line', solver_attr="_ACH_sigma")
+        self._ACH_Dh       = self._make_field_row(self.acBox.layout(), "HYDR. DIAMETER Dh", 'line', solver_attr="_ACH_Dh")
+        self._ACH_alpha    = self._make_field_row(self.acBox.layout(), "AREA DENSITY α=A/V", 'line', solver_attr="_ACH_alpha")
+        self._ACH_Af_over_A= self._make_field_row(self.acBox.layout(), "FIN AREA FRACTION Af/A", 'line', solver_attr="_ACH_Af_over_A")
+        self._ACH_eta_f    = self._make_field_row(self.acBox.layout(), "FIN EFFICIENCY η_f (opt)", 'line', solver_attr="_ACH_eta_f")
+        self._ACH_eta_o_hot= self._make_field_row(self.acBox.layout(), "OVERALL SURF. EFF. η_o (opt)", 'line', solver_attr="_ACH_eta_o_hot")
+        self._ACH_jH       = self._make_field_row(self.acBox.layout(), "j-FACTOR j_H", 'line', solver_attr="_ACH_jH")
+        self._ACH_f_core   = self._make_field_row(self.acBox.layout(), "CORE friction factor f", 'line', solver_attr="_ACH_f_core")
 
-        # Derived outputs list
+        # Derived outputs
         self.out_labels = {}
         for title in [
             "LMTD", "HOT Cp (in/out/avg)", "COLD Cp (in/out/avg)",
             "HOT HEAT CAPACITY RATE Ch", "COLD HEAT CAPACITY RATE Cc",
             "Cmin / Cmax / Cr", "HOT INLET/OUTLET VELOCITY", "COLD INLET/OUTLET VELOCITY",
-            "Channels per pass (hot/cold)", "Mass flow per channel (hot/cold)"
+            "Channels per pass (hot/cold)", "Mass flow per channel (hot/cold)",
+            # Plate extras
+            "Dh (hydraulic diameter)", "G (mass velocity) H/C", "Re (hot/cold)",
+            "h (hot/cold)", "U (calc)", "ΔP hot / ΔP cold / ΔP total",
+            "ε (from NTU, Cr)", "Tho/Tco from ε-NTU", "Entropy S_gen / N_s",
+            # S&T and ACHE extras
+            "UA (S&T)", "U (S&T)", "Δp core (ACHE)"
         ]:
             lab = QLabel(f"{title}: —")
             lab.setWordWrap(True)
             self.outputsLayout.addWidget(lab)
             self.out_labels[title] = lab
 
-        # Extra derived readouts (paper-driven)
-        for title in [
-            "Dh (hydraulic diameter)",
-            "G (mass velocity) H/C",
-            "Re (hot/cold)",
-            "h (hot/cold)",
-            "U (calc)",
-            "ΔP hot / ΔP cold / ΔP total",
-            "ε (from NTU, Cr)",
-            "Tho/Tco from ε-NTU",
-            "Entropy S_gen / N_s",
-        ]:
-            lab = QLabel(f"{title}: —")
-            lab.setWordWrap(True)
-            self.outputsLayout.addWidget(lab)
-            self.out_labels[title] = lab
-
-        # Solve Log (right) with Verbosity menu
+        # Solve Log (right)
         self.solveLogHeaderRow = QHBoxLayout()
         self.solveLogHeader = self._section_header("Solve Log")
         self.logMenuBtn = QToolButton()
-        self.logMenuBtn.setText("Verbosity ▾")
+        self.logMenuBtn.setText("Verbosity")
         self.logMenuBtn.setToolTip("Select what to print in the log")
         self.logMenuBtn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.logMenuBtn.setStyleSheet("QToolButton { padding: 2px 8px; }")
         self.logMenu = QMenu(self)
         self.actShowIter = QAction("Show iteration prints", self, checkable=True, checked=True)
-        self.actPretty = QAction("Include pretty_print()", self, checkable=True, checked=False)  # default OFF
+        self.actPretty = QAction("Include pretty_print()", self, checkable=True, checked=False)
         self.logMenu.addAction(self.actShowIter)
         self.logMenu.addAction(self.actPretty)
         self.logMenuBtn.setMenu(self.logMenu)
@@ -364,7 +371,7 @@ class HxSolver(QWidget):
         self.solveLog.setMaximumBlockCount(20000)
         self.solveLog.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
-        # Plot (bottom — spans mid + right only; left column will row‑span)
+        # Plot
         self.canvas = MplCanvas(self, width=8, height=4.0, dpi=100)
         self.canvas.setMinimumHeight(300)
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -381,11 +388,8 @@ class HxSolver(QWidget):
         self.hxTypeSelection.currentTextChanged.connect(self._on_hx_type_changed)
 
         # Assemble grid
-        # Row 0: Title
         self.grid.addLayout(self.titleLayout, 0, 0, 1, 3)
-        # Row 1: Units
         self.grid.addLayout(self.unitsBar, 1, 0, 1, 3)
-        # LEFT (row‑span rows 2–3): Hot / Cold / Core / Geometry / Buttons
         self.left_col.addWidget(self._section_header("Hot Side"))
         self.left_col.addLayout(self.hotSideLayout)
         self.left_col.addWidget(self._hline())
@@ -395,38 +399,37 @@ class HxSolver(QWidget):
         self.left_col.addWidget(self._section_header("Core HX Properties"))
         self.left_col.addLayout(self.coreLayout)
         self.left_col.addWidget(self._hline())
-        self.left_col.addWidget(self._section_header("Geometry / Plate"))
+        self.left_col.addWidget(self._section_header("Geometry"))
+        # Mount the three geometry sub-containers; visibility is controlled by _on_hx_type_changed
+        self.dimensionsLayout.addWidget(self.plateBox)
+        self.dimensionsLayout.addWidget(self.stBox)
+        self.dimensionsLayout.addWidget(self.acBox)
         self.left_col.addLayout(self.dimensionsLayout)
         self.left_col.addWidget(self._hline())
         self.left_col.addLayout(self.buttonsLayout)
         self.grid.addLayout(self.left_col, 2, 0, 2, 1)
 
-        # MID: Derived
         self.mid_col.addWidget(self._section_header("Derived / Read-only"))
         self.mid_col.addLayout(self.outputsLayout)
         self.grid.addLayout(self.mid_col, 2, 1)
 
-        # RIGHT: Solve log
         self.right_col.addLayout(self.solveLogHeaderRow)
         self.right_col.addWidget(self.solveLog)
         self.grid.addLayout(self.right_col, 2, 2)
 
-        # Row 3: Graph (mid + right)
         self.grid.addWidget(self.canvas, 3, 1, 1, 2)
 
-        # Column stretches
-        self.grid.setColumnStretch(0, 4)  # left
-        self.grid.setColumnStretch(1, 3)  # mid
-        self.grid.setColumnStretch(2, 4)  # right
+        self.grid.setColumnStretch(0, 4)
+        self.grid.setColumnStretch(1, 3)
+        self.grid.setColumnStretch(2, 4)
         self.grid.setRowStretch(2, 1)
         self.grid.setRowStretch(3, 2)
 
-        # Initial label refresh and type toggles
         self._refresh_all_labels()
-        self._on_hx_type_changed()  # hide plate-only if not plate
+        self._on_hx_type_changed()
 
     # ─────────────────────────────────────────────────────────────────────
-    # UI builders
+    # UI builders / helpers
     # ─────────────────────────────────────────────────────────────────────
     def _section_header(self, text: str) -> QLabel:
         lab = QLabel(text)
@@ -439,22 +442,28 @@ class HxSolver(QWidget):
         return line
 
     def _make_field_row(self, layout: QVBoxLayout, label_text: str, kind='line', placeholder="", solver_attr: str=None):
-        row = QHBoxLayout()
+        """
+        Create a (label + LockField) row wrapped in its own QWidget container.
+        We store that container by solver_attr so we can show/hide entire rows cleanly.
+        """
+        row_widget = QWidget()
+        row = QHBoxLayout(row_widget)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
         lab = QLabel(label_text)
         fld = LockField(kind=kind)
         fld.set_placeholder(placeholder)
         row.addWidget(lab, 2)
         row.addWidget(fld, 3)
-        layout.addLayout(row)
+        layout.addWidget(row_widget)
         self.label_map[lbl_key(label_text)] = lab
         if solver_attr:
-            self.attr_for_label[lab] = solver_attr  # for hover tooltips
-            # Also expose the LockField on self under the same name for simplicity
-            # (already done by caller: e.g., self._Thi = _make_field_row(..., solver_attr="_Thi"))
+            self.attr_for_label[lab] = solver_attr
+            self.row_for_attr[solver_attr] = row_widget
         return fld
 
     def _all_lock_fields(self):
-        # Add all inputs here so we can bulk-connect & bulk-clear
+        # Return every input LockField we created for quick iteration (connect/clear)
         return [
             # Hot
             self._Thi, self._Tho, self._Pres_H_in, self._H_inlet_ID, self._H_outlet_ID,
@@ -464,10 +473,16 @@ class HxSolver(QWidget):
             self._mdot_c, self._C_in_nm3_hr, self._C_Fluid,
             # Core
             self._q, self._q_max, self._UA, self._NTU, self._F_sub_T, self._epsilon,
-            # Geometry / Plate
+            # Plate
             self._Plate_count, self._Plate_Distribution_Bias, self._Hot_Passes,
             self._Lv, self._Lh, self._Dp, self._pitch, self._t_m, self._b, self._phi,
-            self._fouling_hot, self._fouling_cold
+            self._fouling_hot, self._fouling_cold,
+            # Shell & Tube
+            self._ST_hot_in_tube, self._ST_N_tubes, self._ST_N_tube_passes, self._ST_N_shell_passes,
+            self._ST_Di, self._ST_Do, self._ST_L_pass, self._ST_k_wall, self._ST_Rf_i, self._ST_Rf_o, self._ST_h_o,
+            # Air‑Cooled
+            self._ACH_A_fr, self._ACH_V, self._ACH_sigma, self._ACH_Dh, self._ACH_alpha,
+            self._ACH_Af_over_A, self._ACH_eta_f, self._ACH_eta_o_hot, self._ACH_jH, self._ACH_f_core
         ]
 
     # ─────────────────────────────────────────────────────────────────────
@@ -482,8 +497,8 @@ class HxSolver(QWidget):
         def set_lbl(key, unit):
             if key in self.label_map:
                 lab = self.label_map[key]
-                base = key.replace("__", " ").strip()
-                lab.setText(f"{base}, {unit}")
+                base = lab.text().split(',')[0]  # keep original label text
+                lab.setText(f"{base}, {unit}" if unit else base)
 
         # Hot
         set_lbl(lbl_key("TEMP HOT IN"), tU)
@@ -493,6 +508,7 @@ class HxSolver(QWidget):
         set_lbl(lbl_key("HOT OUTLET I.D."), dU)
         set_lbl(lbl_key("HOT MASS FLOW"), self.massFlowUnitsHot.currentText())
         set_lbl(lbl_key("HOT VOL FLOW (Nm^3/hr)"), "Nm^3/hr")
+
         # Cold
         set_lbl(lbl_key("TEMP COLD IN"), tU)
         set_lbl(lbl_key("TEMP COLD OUT"), tU)
@@ -501,6 +517,7 @@ class HxSolver(QWidget):
         set_lbl(lbl_key("COLD OUTLET I.D."), dU)
         set_lbl(lbl_key("COLD MASS FLOW"), self.massFlowUnitsCold.currentText())
         set_lbl(lbl_key("COLD VOL FLOW (Nm^3/hr)"), "Nm^3/hr")
+
         # Core
         set_lbl(lbl_key("HEAT TRANSFER RATE q"), eU)
         set_lbl(lbl_key("THEORETICAL MAX q"), eU)
@@ -508,11 +525,13 @@ class HxSolver(QWidget):
         set_lbl(lbl_key("NTU"), "(dimensionless)")
         set_lbl(lbl_key("LMTD CORR FACTOR F"), "(dimensionless)")
         set_lbl(lbl_key("EFFECTIVENESS ε"), "(dimensionless)")
-        # Geometry
+
+        # Geometry Labels
         set_lbl(lbl_key("PLATE COUNT"), "(count)")
         set_lbl(lbl_key("ODD CH ASSIGN (Bias)"), "")
         set_lbl(lbl_key("HOT PASSES"), "(count)")
-        # Extended geometry/fouling
+
+        # Plate extended
         set_lbl(lbl_key("VERT PORT DIST L_v"), dU)
         set_lbl(lbl_key("HORIZ PORT DIST L_h"), dU)
         set_lbl(lbl_key("PORT DIAMETER D_p"), dU)
@@ -523,11 +542,36 @@ class HxSolver(QWidget):
         set_lbl(lbl_key("FOULING HOT"), "m²·K/W")
         set_lbl(lbl_key("FOULING COLD"), "m²·K/W")
 
-        # Keep tooltips in sync with any label/unit rename
+        # Shell & Tube
+        set_lbl(lbl_key("HOT IN TUBE? (1/0)"), "(0/1)")
+        set_lbl(lbl_key("TUBES (count)"), "(count)")
+        set_lbl(lbl_key("TUBE PASSES"), "(count)")
+        set_lbl(lbl_key("SHELL PASSES"), "(count)")
+        set_lbl(lbl_key("TUBE Di"), dU)
+        set_lbl(lbl_key("TUBE Do"), dU)
+        set_lbl(lbl_key("TUBE LENGTH/PASS"), dU)
+        set_lbl(lbl_key("TUBE WALL k"), "W/m/K")
+        set_lbl(lbl_key("FOULING (inside)"), "m²·K/W")
+        set_lbl(lbl_key("FOULING (outside)"), "m²·K/W")
+        set_lbl(lbl_key("h_o (shell side, if known)"), "W/m²/K")
+
+        # Air‑Cooled / Compact
+        set_lbl(lbl_key("FRONTAL AREA A_fr"), "m²")
+        set_lbl(lbl_key("CORE VOLUME V"), "m³")
+        set_lbl(lbl_key("FREE-FLOW RATIO σ"), "(dimensionless)")
+        set_lbl(lbl_key("HYDR. DIAMETER Dh"), "m")
+        set_lbl(lbl_key("AREA DENSITY α=A/V"), "1/m")
+        set_lbl(lbl_key("FIN AREA FRACTION Af/A"), "(dimensionless)")
+        set_lbl(lbl_key("FIN EFFICIENCY η_f (opt)"), "(dimensionless)")
+        set_lbl(lbl_key("OVERALL SURF. EFF. η_o (opt)"), "(dimensionless)")
+        set_lbl(lbl_key("j-FACTOR j_H"), "(dimensionless)")
+        set_lbl(lbl_key("CORE friction factor f"), "(dimensionless)")
+
+        # Update tooltips when labels/units change
         self._update_dependency_tooltips()
 
     # ─────────────────────────────────────────────────────────────────────
-    # Unit changes: mdot
+    # Unit changes for mdot
     # ─────────────────────────────────────────────────────────────────────
     def _on_hot_mdot_units_changed(self, new_unit: str):
         txt = self._mdot_h.text().strip()
@@ -569,17 +613,13 @@ class HxSolver(QWidget):
     def _on_hx_type_changed(self):
         hx_type = (self.hxTypeSelection.currentText() or "PLATE").strip().upper()
         is_plate = (hx_type == "PLATE")
+        is_st    = (hx_type == "SHELL & TUBE")
+        is_ac    = (hx_type == "AIR-COOLED")
 
-        # Plate-only widgets: show when plate, hide otherwise
-        for w in [
-            self.plateMaterialLabel, self.plateMaterialSelection,
-            self._Plate_count, self._Plate_Distribution_Bias, self._Hot_Passes,
-            self._Lv, self._Lh, self._Dp, self._pitch, self._t_m, self._b, self._phi,
-            self._fouling_hot, self._fouling_cold
-        ]:
-            w.setVisible(is_plate)
+        self.plateBox.setVisible(is_plate)
+        self.stBox.setVisible(is_st)
+        self.acBox.setVisible(is_ac)
 
-        # Recompute tooltips and (optionally) solve to refresh derived for the new type
         self._update_dependency_tooltips()
         self.solve()
 
@@ -588,9 +628,8 @@ class HxSolver(QWidget):
     # ─────────────────────────────────────────────────────────────────────
     def solve(self):
         """
-        Build model from LOCKED fields only (fluids always included),
-        default F_sub_T=1.0 if missing, run solve_hx with menu-selected verbosity,
-        append log with separator + optional pretty_print. Update UI and plot.
+        Build model from locked fields (fluids always included), defaults F_sub_T=1,
+        call model.solve_hx(), update UI, log, and plot.
         """
         try:
             selected_type = self.hxTypeSelection.currentText().strip().lower()
@@ -607,14 +646,14 @@ class HxSolver(QWidget):
             eU_util = _energy_key_for_util(eU_ui)
             ui_known_attrs = set()
 
-            # Push helpers
+            # push helpers
             def push_num_locked(field: LockField, attr: str, from_unit: str, to_unit: str, fluid_for_mdot: str = None):
                 if not field.is_locked(): return
                 txt = field.text().strip()
                 if not txt: return
                 val = _float_or_none(txt)
                 if val is None: return
-                if fluid_for_mdot:  # for mdot conversion paths
+                if fluid_for_mdot:
                     setattr(model, attr, unit_convert(val, from_unit, to_unit, fluid_for_mdot))
                 else:
                     setattr(model, attr, unit_convert(val, from_unit, to_unit))
@@ -693,19 +732,18 @@ class HxSolver(QWidget):
             push_scalar_locked(self._epsilon, "_effectiveness_epsilon")
             push_scalar_locked(self._F_sub_T, "_F_sub_T")
 
-            # HX Type specific (plate only for now)
+            # HX Type specific
             if selected_type == "plate":
                 push_scalar_locked(self._Plate_count, "_Plate_count")
                 push_scalar_locked(self._Hot_Passes, "_Hot_Passes")
                 push_str_always(self._Plate_Distribution_Bias, "_Plate_Distribution_Bias")
-
                 # Extended geometry/fouling
                 push_num_locked(self._Lv, "_Lv", dU, "m")
                 push_num_locked(self._Lh, "_Lh", dU, "m")
                 push_num_locked(self._Dp, "_Dp", dU, "m")
                 push_num_locked(self._pitch, "_pitch", dU, "m")
                 push_num_locked(self._t_m, "_t_m", dU, "m")
-                # b (mean channel gap) is stored in mm in model; convert explicitly
+                # b (mean channel gap) is stored in mm in model
                 if self._b.is_locked():
                     txt = self._b.text().strip()
                     if txt:
@@ -717,13 +755,38 @@ class HxSolver(QWidget):
                 push_scalar_locked(self._fouling_hot, "_fouling_hot")
                 push_scalar_locked(self._fouling_cold, "_fouling_cold")
 
-            # Ensure F_sub_T default=1.0 (enables UA=q/(LMTD·F) path)
+            if selected_type == "shell & tube":
+                push_scalar_locked(self._ST_hot_in_tube, "_ST_hot_in_tube")
+                push_scalar_locked(self._ST_N_tubes, "_ST_N_tubes")
+                push_scalar_locked(self._ST_N_tube_passes, "_ST_N_tube_passes")
+                push_scalar_locked(self._ST_N_shell_passes, "_ST_N_shell_passes")
+                push_num_locked(self._ST_Di, "_ST_Di", dU, "m")
+                push_num_locked(self._ST_Do, "_ST_Do", dU, "m")
+                push_num_locked(self._ST_L_pass, "_ST_L_pass", dU, "m")
+                push_scalar_locked(self._ST_k_wall, "_ST_k_wall")
+                push_scalar_locked(self._ST_Rf_i, "_ST_Rf_i")
+                push_scalar_locked(self._ST_Rf_o, "_ST_Rf_o")
+                push_scalar_locked(self._ST_h_o, "_ST_h_o")
+
+            if selected_type == "air-cooled":
+                push_scalar_locked(self._ACH_A_fr, "_ACH_A_fr")
+                push_scalar_locked(self._ACH_V, "_ACH_V")
+                push_scalar_locked(self._ACH_sigma, "_ACH_sigma")
+                push_scalar_locked(self._ACH_Dh, "_ACH_Dh")
+                push_scalar_locked(self._ACH_alpha, "_ACH_alpha")
+                push_scalar_locked(self._ACH_Af_over_A, "_ACH_Af_over_A")
+                push_scalar_locked(self._ACH_eta_f, "_ACH_eta_f")
+                push_scalar_locked(self._ACH_eta_o_hot, "_ACH_eta_o_hot")
+                push_scalar_locked(self._ACH_jH, "_ACH_jH")
+                push_scalar_locked(self._ACH_f_core, "_ACH_f_core")
+
+            # Ensure F_sub_T default=1.0
             if getattr(model, "_F_sub_T", None) is None:
                 setattr(model, "_F_sub_T", 1.0)
 
-            # Verbosity
+            # Verbosity controls
             show_iter = self.actShowIter.isChecked()
-            show_pp = self.actPretty.isChecked()
+            show_pp   = self.actPretty.isChecked()
 
             buf = io.StringIO()
             with redirect_stdout(buf):
@@ -733,7 +796,7 @@ class HxSolver(QWidget):
                     model.pretty_print()
             log_text = buf.getvalue()
             self._solve_count += 1
-            if self.solveLog.toPlainText(): self.solveLog.appendPlainText("\n" + "-"*80)
+            if self.solveLog.toPlainText(): self.solveLog.appendPlainText("-"*80)
             self.solveLog.appendPlainText(f"Solve #{self._solve_count}")
             self.solveLog.appendPlainText(log_text)
 
@@ -745,7 +808,6 @@ class HxSolver(QWidget):
                                 f"{ex}"
                                 )
         finally:
-            # Keep tooltips informative even after a failed solve
             self._update_dependency_tooltips()
 
     # ─────────────────────────────────────────────────────────────────────
@@ -756,48 +818,53 @@ class HxSolver(QWidget):
         pU = self.pressureUnits.currentText()
         dU = self.distanceUnits.currentText()
 
-        def set_text(field: LockField, text: str, solved: bool):
-            field.setText(text); field.mark_solved(solved)
+        def solved_flag(attr: str, field: LockField):
+            return (attr not in ui_known_attrs) and (not field.is_locked())
+
+        def set_text_if_solved(field: LockField, text: str, solved: bool):
+            if solved:
+                field.setText(text)
+            field.mark_solved(solved)
 
         def show_num(field: LockField, attr: str, from_unit: str, to_unit: str, digits=6):
             val = getattr(model, attr, None)
             if val is None: return
-            solved = (attr not in ui_known_attrs) and (not field.is_locked())
+            solved = solved_flag(attr, field)
             try: shown = unit_convert(val, from_unit, to_unit)
             except Exception: shown = val
-            set_text(field, str(round(shown, digits)), solved)
+            set_text_if_solved(field, str(round(shown, digits)), solved)
 
         def show_mdot(field: LockField, attr: str, units_combo: QComboBox, fluid_field: LockField, digits=6):
             val = getattr(model, attr, None)
             if val is None: return
-            solved = (attr not in ui_known_attrs) and (not field.is_locked())
+            solved = solved_flag(attr, field)
             units = units_combo.currentText()
             fluid = (fluid_field.text().strip() or "AIR")
             try: shown = unit_convert(val, "kg/s", units, fluid)
             except Exception: shown = val
-            set_text(field, str(round(shown, digits)), solved)
+            set_text_if_solved(field, str(round(shown, digits)), solved)
 
         def show_nm3hr(field: LockField, attr: str, digits=6):
             val = getattr(model, attr, None)
             if val is None: return
-            solved = (attr not in ui_known_attrs) and (not field.is_locked())
-            set_text(field, str(round(val, digits)), solved)
+            solved = solved_flag(attr, field)
+            set_text_if_solved(field, str(round(val, digits)), solved)
 
         def show_plain(field: LockField, attr: str, digits=6):
             val = getattr(model, attr, None)
             if val is None: return
-            solved = (attr not in ui_known_attrs) and (not field.is_locked())
-            set_text(field, str(round(val, digits)), solved)
+            solved = solved_flag(attr, field)
+            set_text_if_solved(field, str(round(val, digits)), solved)
 
         def show_power(field: LockField, attr: str, digits=6):
             val = getattr(model, attr, None)
             if val is None: return
-            solved = (attr not in ui_known_attrs) and (not field.is_locked())
+            solved = solved_flag(attr, field)
             try:
                 shown = unit_convert(val, "W", _energy_key_for_util(self.energyUnits.currentText()))
             except Exception:
                 shown = val
-            set_text(field, str(round(shown, digits)), solved)
+            set_text_if_solved(field, str(round(shown, digits)), solved)
 
         # HOT
         show_num(self._Thi, "_Thi", "K", tU)
@@ -819,13 +886,15 @@ class HxSolver(QWidget):
         show_nm3hr(self._C_in_nm3_hr, "_C_in_nm3_hr")
         self._C_Fluid.mark_solved(False)
 
-        # CORE & GEOMETRY
+        # CORE
         show_power(self._q, "_q")
         show_power(self._q_max, "_q_max")
         show_plain(self._UA, "_UA")
         show_plain(self._NTU, "_NTU")
         show_plain(self._epsilon, "_effectiveness_epsilon")
         show_plain(self._F_sub_T, "_F_sub_T")
+
+        # Plate-only echoes
         show_plain(self._Plate_count, "_Plate_count")
         show_plain(self._Hot_Passes, "_Hot_Passes")
         bias = getattr(model, "_Plate_Distribution_Bias", None)
@@ -833,12 +902,14 @@ class HxSolver(QWidget):
             self._Plate_Distribution_Bias.setText(str(bias))
             self._Plate_Distribution_Bias.mark_solved(False)
 
-        # Derived labels (existing)
+        # Derived labels (legacy)
         def fmt(x, u=None, nd=6):
             if x is None: return "—"
-            if u is None: return f"{round(x, nd)}"
-            try: return f"{round(x, nd)} {u}"
-            except Exception: return str(x)
+            try:
+                s = round(float(x), nd)
+            except Exception:
+                return str(x)
+            return f"{s} {u}" if u else f"{s}"
 
         self.out_labels["LMTD"].setText(
             f"LMTD: {fmt(getattr(model, '_lmtd', None), self.temperatureUnits.currentText())}"
@@ -883,7 +954,7 @@ class HxSolver(QWidget):
             f"{fmt(getattr(model, '_mdot_c_channel', None), 'kg/s')}"
         )
 
-        # New derived items (paper-driven)
+        # Plate-derived items
         self.out_labels["Dh (hydraulic diameter)"].setText(
             f"Dh: {fmt(getattr(model, '_Dh', None), 'm')}"
         )
@@ -919,6 +990,17 @@ class HxSolver(QWidget):
             f"{fmt(getattr(model, '_Ns', None), '')}"
         )
 
+        # S&T and ACHE extras
+        self.out_labels["UA (S&T)"].setText(
+            f"UA_S&T: {fmt(getattr(model, '_ST_UA', None), 'W/K')}"
+        )
+        self.out_labels["U (S&T)"].setText(
+            f"U_S&T: {fmt(getattr(model, '_ST_U', None), 'W/m²/K')}"
+        )
+        self.out_labels["Δp core (ACHE)"].setText(
+            f"Δp_core: {fmt(getattr(model, '_ACH_dp_core', None), 'Pa')}"
+        )
+
         # Plot
         self._draw_temperature_profile(model)
 
@@ -945,8 +1027,12 @@ class HxSolver(QWidget):
         def k2ui_s(Tk): return unit_convert(Tk, "K", tU) if Tk is not None else None
         def k2ui_a(Tarr): return np.array([unit_convert(float(v), "K", tU) for v in np.atleast_1d(Tarr)])
 
-        ThiK = getattr(model, "_Thi", None); ThoK = getattr(model, "_Tho", None)
-        TciK = getattr(model, "_Tci", None); TcoK = getattr(model, "_Tco", None)
+        # Inlet temps (always the inlets)
+        ThiK = getattr(model, "_Thi", None)
+        TciK = getattr(model, "_Tci", None)
+        # Outlet temps: prefer locked/direct; else ε–NTU results
+        ThoK = getattr(model, "_Tho", None) or getattr(model, "_Tho_eps", None)
+        TcoK = getattr(model, "_Tco", None) or getattr(model, "_Tco_eps", None)
         Ch = getattr(model, "_Ch", None); Cc = getattr(model, "_Cc", None)
         UA = getattr(model, "_UA", None); NTU_m = getattr(model, "_NTU", None)
         is_counter = bool(getattr(model, "_Flow_Direction", True))
@@ -964,8 +1050,7 @@ class HxSolver(QWidget):
         Thi = k2ui_s(ThiK); Tho = k2ui_s(ThoK); Tci = k2ui_s(TciK); Tco = k2ui_s(TcoK)
 
         def draw_axes(title=""):
-            ax.set_title(f"Temperature Profiles along Heat Exchanger — {title}" if title else
-                         "Temperature Profiles along Heat Exchanger")
+            ax.set_title(f"Temperature Profiles — {title}" if title else "Temperature Profiles")
             ax.set_xlabel("Normalized length (x/L)")
             ax.set_ylabel(f"Temperature, {tU}")
             ax.grid(True)
@@ -974,8 +1059,10 @@ class HxSolver(QWidget):
         have_hot = (Thi is not None and Tho is not None)
         have_cold = (Tci is not None and Tco is not None)
         x = np.linspace(0.0, 1.0, 200)
+        endpoints_ready = bool(have_hot and have_cold)
 
-        # Single-stream
+
+        # Single-stream linear
         if have_hot and not have_cold:
             Th = Thi + (Tho - Thi) * x
             ax.plot(x, Th, color=HOT, label="Hot stream (Th)")
@@ -989,7 +1076,7 @@ class HxSolver(QWidget):
                 Tc = Tco + (Tci - Tco) * x; subtitle = "Cold only — Counterflow"
                 l0, l1 = f"Tco = {round(Tc[0],3)} {tU}", f"Tci = {round(Tc[-1],3)} {tU}"
             else:
-                Tc = Tci + (Tco - Tci) * x; subtitle = "Cold only — Parallel flow"
+                Tc = Tci + (Tco - Tci) * x; subtitle = "Cold only — Parallel"
                 l0, l1 = f"Tci = {round(Tc[0],3)} {tU}", f"Tco = {round(Tc[-1],3)} {tU}"
             ax.plot(x, Tc, color=COLD, label="Cold stream (Tc)")
             draw_axes(subtitle)
@@ -997,7 +1084,37 @@ class HxSolver(QWidget):
             self._annotate_point(1.0, Tc[-1], l1, COLD, ha="right", dx=-0.015)
             ax.legend(loc="best"); self.canvas.draw(); return
 
-        # Physics mode
+        # Physics-based ODE surrogate if UA/NTU available
+        # If all endpoints are ready, draw straight lines that connect them.
+        # Counterflow mapping of cold stream endpoints:
+        #   x=0: (Thi, Tco),  x=1: (Tho, Tci)
+        if endpoints_ready:
+            if not is_counter:
+                # parallel
+                Th = Thi + (Tho - Thi) * x
+                Tc = Tci + (Tco - Tci) * x
+                ax.plot(x, Th, color=HOT, label="Hot stream (Th)")
+                ax.plot(x, Tc, color=COLD, label="Cold stream (Tc)")
+                draw_axes("Parallel")
+                self._annotate_point(0.0, Th[0], f"Thi = {round(Th[0],3)} {tU}", HOT, ha="left")
+                self._annotate_point(1.0, Th[-1], f"Tho = {round(Th[-1],3)} {tU}", HOT, ha="right", dx=-0.015)
+                self._annotate_point(0.0, Tc[0], f"Tci = {round(Tc[0],3)} {tU}", COLD, ha="left")
+                self._annotate_point(1.0, Tc[-1], f"Tco = {round(Tc[-1],3)} {tU}", COLD, ha="right", dx=-0.015)
+                ax.legend(loc="best"); self.canvas.draw(); return
+            else:
+                # counterflow
+                Th = Thi + (Tho - Thi) * x
+                Tc = Tco + (Tci - Tco) * x  # note swapped ends for cold line
+                ax.plot(x, Th, color=HOT, label="Hot stream (Th)")
+                ax.plot(x, Tc, color=COLD, label="Cold stream (Tc)")
+                draw_axes("Counterflow")
+                self._annotate_point(0.0, Th[0], f"Thi = {round(Th[0],3)} {tU}", HOT, ha="left")
+                self._annotate_point(1.0, Th[-1], f"Tho = {round(Th[-1],3)} {tU}", HOT, ha="right", dx=-0.015)
+                self._annotate_point(0.0, Tc[0], f"Tco = {round(Tc[0],3)} {tU}", COLD, ha="left")
+                self._annotate_point(1.0, Tc[-1], f"Tci = {round(Tc[-1],3)} {tU}", COLD, ha="right", dx=-0.015)
+                ax.legend(loc="best"); self.canvas.draw(); return
+
+        # Otherwise, use the physics-based ODE surrogate if UA/NTU are present.
         have_caps = (Ch and Ch > 0 and Cc and Cc > 0 and ThiK is not None and TciK is not None)
         NTU = None
         if NTU_m is not None and NTU_m > 0:
@@ -1025,18 +1142,16 @@ class HxSolver(QWidget):
                 self._annotate_point(0.0, Tc_p[0], f"Tci = {round(Tc_p[0],3)} {tU}", COLD, ha="left")
                 self._annotate_point(1.0, Tc_p[-1], f"Tco = {round(Tc_p[-1],3)} {tU}", COLD, ha="right", dx=-0.015)
             else:
-                # counter
-                k = (alpha - beta); eps = 1e-12
-                if abs(k) < eps:
-                    Ccst = (ThiK - TciK) / (1.0 + beta * NTU)
-                    Th_tau = ThiK - alpha * Ccst * tau
-                    Tc_tau = TciK + beta * Ccst * (NTU - tau)
-                else:
-                    Ccst = (ThiK - TciK) / (1.0 + (beta / k) * (1.0 - np.exp(-k * NTU)))
-                    int0 = (Ccst / k) * (1.0 - np.exp(-k * tau))
-                    intN = (Ccst / k) * (np.exp(-k * tau) - np.exp(-k * NTU))
-                    Th_tau = ThiK - alpha * int0
-                    Tc_tau = TciK + beta * intN
+                # counter (ODE fallback only when endpoints are not all available)
+                # To avoid endpoint mismatch, drive the ODE between known inlets.
+                # Simple exponential model for ΔT with constant UA/Ch/Cc:
+                # ΔT(x) = (Thi - Tci)*exp(-(alpha+beta)*tau)
+                dT0 = ThiK - TciK
+                dT_tau = dT0 * np.exp(-(alpha + beta) * tau)
+                # Enforce energy balance: mass-averaged line between inlets
+                S = Ch * ThiK + Cc * TciK
+                Th_tau = (S + Cc * dT_tau) / (Ch + Cc)
+                Tc_tau = (S - Ch * dT_tau) / (Ch + Cc)
                 Th_p = k2ui_a(Th_tau); Tc_p = k2ui_a(Tc_tau)
                 ax.plot(x, Th_p, color=HOT, label="Hot stream (Th)")
                 ax.plot(x, Tc_p, color=COLD, label="Cold stream (Tc)")
@@ -1048,28 +1163,24 @@ class HxSolver(QWidget):
             ax.legend(loc="best"); self.canvas.draw(); return
 
         # Linear fallback
-        if have_hot or have_cold:
-            subtitle = "Linear fallback — "
-            if have_hot:
-                Th = Thi + (Tho - Thi) * x
-                ax.plot(x, Th, color=HOT, label="Hot stream (Th)")
-                self._annotate_point(0.0, Th[0], f"Thi = {round(Th[0],3)} {tU}", HOT, ha="left")
-                self._annotate_point(1.0, Th[-1], f"Tho = {round(Th[-1],3)} {tU}", HOT, ha="right", dx=-0.015)
-            if have_cold:
-                if is_counter:
-                    Tc = Tco + (Tci - Tco) * x; subtitle += "Counterflow"
-                    l0, l1 = f"Tco = {round(Tc[0],3)} {tU}", f"Tci = {round(Tc[-1],3)} {tU}"
-                else:
-                    Tc = Tci + (Tco - Tci) * x; subtitle += "Parallel flow"
-                    l0, l1 = f"Tci = {round(Tc[0],3)} {tU}", f"Tco = {round(Tc[-1],3)} {tU}"
-                ax.plot(x, Tc, color=COLD, label="Cold stream (Tc)")
-                self._annotate_point(0.0, Tc[0], l0, COLD, ha="left")
-                self._annotate_point(1.0, Tc[-1], l1, COLD, ha="right", dx=-0.015)
-            draw_axes(subtitle.strip(" —"))
-            ax.legend(loc="best"); self.canvas.draw(); return
-
-        draw_axes("Insufficient data")
-        self.canvas.draw()
+        subtitle = []
+        if have_hot:
+            Th = Thi + (Tho - Thi) * x
+            ax.plot(x, Th, color=HOT, label="Hot stream (Th)")
+            self._annotate_point(0.0, Th[0], f"Thi = {round(Th[0],3)} {tU}", HOT, ha="left")
+            self._annotate_point(1.0, Th[-1], f"Tho = {round(Th[-1],3)} {tU}", HOT, ha="right", dx=-0.015)
+        if have_cold:
+            if is_counter:
+                Tc = Tco + (Tci - Tco) * x; subtitle.append("Counterflow")
+                l0, l1 = f"Tco = {round(Tc[0],3)} {tU}", f"Tci = {round(Tc[-1],3)} {tU}"
+            else:
+                Tc = Tci + (Tco - Tci) * x; subtitle.append("Parallel")
+                l0, l1 = f"Tci = {round(Tc[0],3)} {tU}", f"Tco = {round(Tc[-1],3)} {tU}"
+            ax.plot(x, Tc, color=COLD, label="Cold stream (Tc)")
+            self._annotate_point(0.0, Tc[0], l0, COLD, ha="left")
+            self._annotate_point(1.0, Tc[-1], l1, COLD, ha="right", dx=-0.015)
+        draw_axes(" / ".join(subtitle) if subtitle else "Insufficient data")
+        ax.legend(loc="best"); self.canvas.draw()
 
     # ─────────────────────────────────────────────────────────────────────
     # Clear
@@ -1100,7 +1211,6 @@ class HxSolver(QWidget):
                 continue
             if include_unlocked or fld.is_locked():
                 known.add(attr)
-        # Always include HX type / flow direction selection keys if helpful later
         return known
 
     def _build_ui_name_map(self) -> dict:
@@ -1112,7 +1222,9 @@ class HxSolver(QWidget):
 
     def _update_dependency_tooltips(self) -> None:
         try:
-            model_tmp = hx.HeatExchanger(HX_Type=self.hxTypeSelection.currentText().strip().lower())
+            # ensure type gating matches current selection
+            model_tmp = hx.HeatExchanger(HX_Type=self.hxTypeSelection.currentText().strip().lower(),
+                                         Counter_Flow=_to_bool(self.flowDirectionSelection.currentText()))
             known = self._current_known_attributes(include_unlocked=True)
             ui_map = self._build_ui_name_map()
             for lab, attr in self.attr_for_label.items():
@@ -1120,8 +1232,6 @@ class HxSolver(QWidget):
                 lab.setToolTip(html)
         except Exception:
             pass
-
-
 # ────────────────────────────────────────────────────────────────────────────────
 # Entrypoint
 # ────────────────────────────────────────────────────────────────────────────────
