@@ -82,23 +82,17 @@ class MyTableWidget(QWidget):
         self.tab3 = ChargingCalculator(self)
         self.tab4 = Conversions(self)
         self.tab5 = thermalSolver(self)
-<<<<<<< HEAD
+        self.tab6 = CMEAssessmentWidget(self)
         self.tab7 = HxSolver(self)
-        self.tab6 = CMEAssessmentWidget(self)
-=======
-        self.tab6 = CMEAssessmentWidget(self)
->>>>>>> bjoha/cme_assessment
 
         self.tabs.addTab(self.tab1, "Orifice Calculator")
         self.tabs.addTab(self.tab2, "Blowdown Calculator")
         self.tabs.addTab(self.tab3, "Charging Calculator")
         self.tabs.addTab(self.tab4, "Unit Conversions")
         self.tabs.addTab(self.tab5, "Thermal Calculator")
-<<<<<<< HEAD
-        self.tabs.addTab(self.tab7, "HX Calculator")
-=======
         self.tabs.addTab(self.tab6, "CME Assessment")
->>>>>>> bjoha/cme_assessment
+        self.tabs.addTab(self.tab7, "HX Calculator")
+
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
