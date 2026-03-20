@@ -28,7 +28,8 @@ CoolProp_names = {
     "CP": "CPMASS",
     "CV": "CVMASS",
     "D" :"D",
-    "H" : "HMASS"
+    "H" : "HMASS",
+    "VIS": "VISCOSITY"
 }
 
 def getfluidproperty(
