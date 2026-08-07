@@ -28,7 +28,8 @@ CoolProp_names = {
     "CP": "CPMASS",
     "CV": "CVMASS",
     "D" :"D",
-    "H" : "HMASS"
+    "H" : "HMASS",
+    "VIS": "VISCOSITY"
 }
 
 def getfluidproperty(
@@ -118,6 +119,7 @@ fluid_names = [
     "AMMONIA",
     "ARGON",
     "CARBON DIOXIDE",
+    "WATER",
     "HELIUM",
     "HYDROGEN",
     "METHANE",
@@ -896,3 +898,48 @@ def Grashof(fluid,
 
 def Rayleigh(Grashof, Prandtl):
     return Grashof * Prandtl
+
+
+def LMTD(Thi, Tho, Tci, Tco, counterflow=True):
+    if counterflow:
+        dTF1 = Thi-Tco
+        dTF2 = Tho-Tci
+    else:
+        dTF1 = Thi-Tci
+        dTF2 = Tho-Tco
+
+    ratio = dTF2/dTF1
+    if not counterflow and (ratio <= 0.0 or ratio == 1.0):
+        return 0.0
+    elif counterflow and (ratio <= 0.0 or ratio == 1.0):
+        return dTF1
+    else:
+        return (dTF2 - dTF1)/m.log(dTF2/dTF1)
+    
+def water_psat(T_K: float) -> float:
+    """
+    Saturation pressure of water at temperature T [K], returns Pa.
+    Uses CoolProp's saturation relation; available regardless of REFPROP/CoolProp mode.
+    """
+    return float(PropsSI("P", "T", float(T_K), "Q", 0.0, "Water"))
+
+def water_phase(T_K: float, P_Pa: float) -> str:
+    """
+    Return a simple phase label for water at (T, P):
+      - "two-phase" if quality Q in (0,1)
+      - "liquid"    if Q <= 0  (subcooled/compressed)
+      - "vapor"     if Q >= 1  (superheated)
+    Falls back to psat(T) comparison if direct Q evaluation is out of range.
+    """
+    try:
+        Q = PropsSI("Q", "T", float(T_K), "P", float(P_Pa), "Water")
+        if 0.0 < Q < 1.0:
+           return "two-phase"
+        return "liquid" if Q <= 0.0 else "vapor"
+    except Exception:
+        # If (T,P) is entirely outside saturation dome, compare to psat(T)
+        try:
+            psat = water_psat(T_K)
+            return "liquid" if P_Pa > psat else "vapor"
+        except Exception:
+            return "unknown"

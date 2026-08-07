@@ -46,7 +46,7 @@ class Node:
         self.medium = medium
         self.medium_type = medium_type
         if self.medium_type == "FLUID":
-            self.density = c.getfluidproperty(
+            self.density = u.getfluidproperty(
                 self.medium,
                 'D',
                 'T',
